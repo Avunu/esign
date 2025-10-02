@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../../../tmp/tmp-3633-UK3qC31gqzpx/esign/esign/public/css/esign.bundle.css"],
+  "sourcesContent": ["@media screen {\n  body {\n    display: block !important;\n    overflow-x: clip !important;\n    overflow-y: scroll !important;\n  }\n  .tooltip-content {\n    display: none !important;\n  }\n  #print-view-frame {\n    width: 100%;\n    height: 80vh;\n    border: none;\n  }\n  .mobile-required-message {\n    margin: 2rem;\n  }\n  .mobile-required-message .qr-code-container {\n    margin: 1rem 0;\n  }\n}\n@media screen and (min-width: 768px) {\n  .hide-mobile {\n    display: none !important;\n  }\n}\n@media screen and (max-width: 991.98px) {\n  .mobile-required-message {\n    display: none !important;\n  }\n}"],
+  "mappings": ";AAAA;AACE;AACE;AACA;AACA;AAAA;AAEF;AACE;AAAA;AAEF;AACE;AACA;AACA;AAAA;AAEF;AACE;AAAA;AAEF;AACE;AAAA;AAAA;AAGJ;AACE;AACE;AAAA;AAAA;AAGJ;AACE;AACE;AAAA;AAAA;",
+  "names": []
+}

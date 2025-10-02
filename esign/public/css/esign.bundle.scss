@@ -1,0 +1,44 @@
+@import "~bootstrap/scss/functions";
+@import "~bootstrap/scss/variables";
+@import "~bootstrap/scss/mixins/breakpoints";
+
+@media screen {
+
+	body {
+		display: block !important;
+		overflow-x: clip !important;
+		overflow-y: scroll !important;
+	}
+
+	.tooltip-content {
+		display: none !important;
+	}
+
+	#print-view-frame {
+		width: 100%;
+		height: 80vh;
+		border: none;
+	}
+
+	.mobile-required-message {
+		margin: 2rem;
+
+		.qr-code-container {
+			margin: 1rem 0;
+		}
+	}
+
+	// Hide desktop content on mobile devices when force_mobile is true
+	@include media-breakpoint-up(md) {
+		.hide-mobile {
+			display: none !important;
+		}
+	}
+
+	// Hide mobile message on mobile devices
+	@include media-breakpoint-down(md) {
+		.mobile-required-message {
+			display: none !important;
+		}
+	}
+}
