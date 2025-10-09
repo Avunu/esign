@@ -1,0 +1,121 @@
+/* Cursive styling for typed signatures */
+.signature-typed-input {
+	font-family: 'Brush Script MT', 'Lucida Handwriting', 'Bradley Hand',
+		'Segoe Script', 'Segoe UI', cursive !important;
+	font-size: 50px !important;
+	font-style: italic;
+	font-weight: 400;
+	letter-spacing: 0.5px;
+	color: #1a1a1a;
+	padding: 2rem 2rem 3rem 2rem;
+	height: 200px;
+	position: relative;
+	background-color: rgb(243, 243, 243);
+	border: 1px solid #d1d8dd;
+}
+
+/* Signature line at the bottom */
+.signature-typed-input::after {
+	content: '';
+	position: absolute;
+	left: 2rem;
+	right: 2rem;
+	bottom: 2rem;
+	height: 1px;
+	background-color: #000;
+	pointer-events: none;
+}
+
+/* Optional: Add some visual enhancement */
+.signature-typed-input:focus {
+	border-color: #4A90E2;
+	box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
+	outline: none;
+}
+
+/* Ensure it looks good in read-only display as well */
+.frappe-control[data-fieldname="signature_typed"] .control-value {
+	font-family: 'Brush Script MT', 'Lucida Handwriting', 'Bradley Hand',
+		'Segoe Script', 'Segoe UI', cursive !important;
+	font-size: 24px !important;
+	font-style: italic;
+	font-weight: 400;
+	letter-spacing: 0.5px;
+	color: #1a1a1a;
+}
+
+/* Form tabs styling for signature dialog */
+.modal .form-tabs-list {
+	margin-bottom: 1rem;
+	border-bottom: 1px solid #d1d8dd;
+}
+
+.modal .form-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	padding-left: 0;
+	margin-bottom: 0;
+	list-style: none;
+	border-bottom: none;
+}
+
+.modal .form-tabs .nav-item {
+	margin-bottom: -1px;
+}
+
+.modal .form-tabs .nav-link {
+	display: block;
+	padding: 0.5rem 1rem;
+	color: #6c757d;
+	text-decoration: none;
+	background-color: transparent;
+	border: 1px solid transparent;
+	border-top-left-radius: 0.25rem;
+	border-top-right-radius: 0.25rem;
+	transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+	cursor: pointer;
+}
+
+.modal .form-tabs .nav-link:hover,
+.modal .form-tabs .nav-link:focus {
+	color: #495057;
+	background-color: #f8f9fa;
+	border-color: transparent;
+}
+
+.modal .form-tabs .nav-link.active {
+	color: #495057;
+	background-color: #fff;
+	border-color: #d1d8dd #d1d8dd #fff;
+	font-weight: 600;
+}
+
+.modal .form-tab-content {
+	padding-top: 0.25rem;
+}
+
+.modal .tab-pane {
+	display: none;
+}
+
+.modal .tab-pane.active.show {
+	display: block;
+}
+
+/* Hide default details tab */
+.modal .form-tabs .nav-item.hide {
+	display: none !important;
+}
+
+/* Ensure form sections display properly in tabs */
+.modal .form-section {
+	margin-bottom: 0;
+}
+
+.modal .form-section.visible-section {
+	display: block;
+}
+
+.modal .form-section.empty-section {
+	display: none;
+}

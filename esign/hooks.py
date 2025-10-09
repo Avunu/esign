@@ -5,7 +5,9 @@ app_description = "Collect Electronic Signatures on Frappe Documents via Webform
 app_email = "mail@avu.nu"
 app_license = "mit"
 
-app_include_js = "esign.bundle.js"
+app_include_js = ["esign.bundle.js", "esign.control.bundle.js"]
+app_include_css = ["esign.control.bundle.css"]
+
 
 doctype_js = {
     "Web Form": "public/js/web_form.js",

@@ -100,15 +100,6 @@ function show_esign_dialog(frm) {
 				fieldname: "content",
 				reqd: 1
 			},
-			// {
-			// 	fieldtype: "Section Break",
-			// 	fieldname: "esign_link_section",
-			// 	label: __("eSign Link Preview")
-			// },
-			// {
-			// 	fieldtype: "HTML",
-			// 	fieldname: "esign_link_preview"
-			// },
 			{
 				fieldtype: "Section Break",
 				fieldname: "options_section"

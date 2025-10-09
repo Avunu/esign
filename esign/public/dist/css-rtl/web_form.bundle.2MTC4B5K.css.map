@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../../../../../tmp/tmp-794-WgxkH5YRZT3C/esign/esign/public/css/web_form.bundle.css"],
-  "sourcesContent": ["@media screen {\n  [data-doctype=\"Web Form\"] .page-content-wrapper .container .page_content {\n    max-width: 100% !important;\n    margin: 0 2rem;\n  }\n  #print-view-frame {\n    width: 100vw;\n    height: 80vh;\n    border: none;\n  }\n  .print-format-gutter {\n    background-color: var(--bg-dark-gray);\n    padding: 30px 0px;\n  }\n  .print-format {\n    background-color: white;\n    border-radius: 8px;\n    max-width: 8.3in;\n    min-height: 11.69in;\n    padding: 0.75in;\n    margin: auto;\n    color: var(--gray-900);\n  }\n  .print-preview {\n    padding: 0;\n    max-width: 8.3in;\n    margin: auto;\n    min-height: 11.69in;\n    background: white;\n    border-radius: var(--border-radius);\n  }\n  .print-preview-wrapper {\n    padding: 80px 0;\n    background-color: var(--gray-200);\n  }\n}\n@media screen and (max-width: 991.98px) {\n  .print-preview-wrapper {\n    padding: 0;\n  }\n}"],
-  "mappings": ";AAAA;AACE;AACE;AACA;AAAA;AAEF;AACE;AACA;AACA;AAAA;AAEF;AACE;AACA;AAAA;AAEF;AACE;AACA;AACA;AACA;AACA;AACA;AACA;AAAA;AAEF;AACE;AACA;AACA;AACA;AACA;AACA;AAAA;AAEF;AACE;AACA;AAAA;AAAA;AAGJ;AACE;AACE;AAAA;AAAA;",
-  "names": []
-}

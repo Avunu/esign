@@ -71,11 +71,12 @@ class ExtendedWebForm(PaymentWebForm, BaseWebForm):
         context.web_include_css.extend(
             [
                 "esign.bundle.css",
+                "esign.control.bundle.css",
             ]
         )
         context.web_include_js.extend(
             [
-                # "esign.bundle.js",
+                "esign.control.bundle.js",
                 "web_form.bundle.js",
             ]
         )
