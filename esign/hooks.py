@@ -13,7 +13,10 @@ doctype_js = {
     "Web Form": "public/js/web_form.js",
 }
 
-override_doctype_class = {"Web Form": "esign.esign.overrides.web_form.ExtendedWebForm"}
+override_doctype_class = {
+    "Web Form": "esign.esign.overrides.web_form.ExtendedWebForm",
+    "Email Template": "esign.esign.overrides.email_template.ExtendedEmailTemplate",
+}
 
 doc_events = {
     "*": {

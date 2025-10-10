@@ -1,4 +1,5 @@
 import frappe
+import json
 from frappe.types import DF
 from frappe.website.doctype.web_form.web_form import WebForm as BaseWebForm
 from frappe.www.printview import validate_print_permission
@@ -43,6 +44,35 @@ class ExtendedWebForm(PaymentWebForm, BaseWebForm):
         validate_print_permission(doc)
         # Allow public access to the web form if validation passes
         print_format = frappe.form_dict.get("format", self.print_format) or "standard"
+
+        # Get print format document
+        from frappe.www.printview import (
+            get_print_format_doc,
+            get_rendered_template,
+            get_print_style,
+            set_link_titles,
+        )
+
+        meta = frappe.get_meta(self.doc_type)
+        print_format_doc = get_print_format_doc(print_format, meta=meta)
+        set_link_titles(doc)
+
+        # Get rendered print HTML
+        print_html = get_rendered_template(
+            doc=doc,
+            print_format=print_format_doc,  # type: ignore
+            meta=meta,
+            trigger_print=False,
+            no_letterhead=frappe.form_dict.get("no_letterhead"),
+            letterhead=frappe.form_dict.get("letterhead"),
+            settings=None,
+        )
+
+        # Get print styles
+        print_style = get_print_style(
+            style=frappe.form_dict.get("style"), print_format=print_format_doc  # type: ignore
+        )
+
         web_form_doc: dict = self.as_dict(no_nulls=True)
         web_form_doc.update(
             {
@@ -62,6 +92,11 @@ class ExtendedWebForm(PaymentWebForm, BaseWebForm):
         context.name = cur_doc_name
         context.print_format = print_format
         context.reference_doc = doc
+
+        # Add print view content and styles to context
+        context.print_html = print_html
+        context.print_style = print_style
+
         key = frappe.form_dict.get("key", "")
         context.printview_url = (
             "/api/method/frappe.utils.print_format.download_pdf?"
@@ -255,10 +290,21 @@ def extract_param_from_referrer(param: str = "") -> str:
 
 
 @frappe.whitelist()
-def get_esign_link(doc: Document, web_form_name: str, format_name: str = "") -> str:
+def get_esign_link(
+    doc: "Document", web_form_name: str, print_format_name: str = ""
+) -> str:
     """Get the eSign Web Form link for a given document and web form name."""
-    if not web_form_name or not doc:
-        return ""
+    if isinstance(doc, str):
+        try:
+            doc = json.loads(doc)
+        except Exception as e:
+            return str(e)
+
+    if isinstance(doc, dict):
+        try:
+            doc = frappe.get_doc(doc["doctype"], doc["name"])
+        except Exception as e:
+            return str(e)
 
     try:
         web_form = ExtendedWebForm("Web Form", web_form_name)
@@ -270,10 +316,10 @@ def get_esign_link(doc: Document, web_form_name: str, format_name: str = "") -> 
 
         base_url = get_url()
         share_key = doc.get_document_share_key()
-        web_form_path = f"/{web_form.route}/{doc.name}/edit"
+        web_form_path = f"{web_form.route}/{doc.name}/edit"
         query_string = f"?key={share_key}"
-        if format_name:
-            query_string += f"&format={format_name}"
+        if print_format_name:
+            query_string += f"&format={print_format_name}"
 
         return f"{base_url}{web_form_path}{query_string}"
 
@@ -291,5 +337,5 @@ def get_esign_web_forms(doctype):
     return frappe.get_all(
         "Web Form",
         filters={"doc_type": doctype, "esign_enabled": 1, "published": 1},
-        fields=["name", "title", "route"],
+        fields=["name", "title", "route", "print_format"],
     )

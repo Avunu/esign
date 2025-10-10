@@ -1,6 +1,7 @@
 $(document).on('form-load', function (event, frm) {
 	frappe.db.count("Web Form", { filters: { "doc_type": frm.doctype, "esign_enabled": 1 }, limit: 1 }).then((exists) => {
 		if (exists) {
+			const esign_dialog = new ESignDialog(frm);
 			frm.add_custom_button(
 				__("Send for eSign"),
 				() => {
@@ -8,247 +9,303 @@ $(document).on('form-load', function (event, frm) {
 						frappe.msgprint(__("Please save the document before sending for eSign."));
 						return;
 					}
-					show_esign_dialog(frm);
+					esign_dialog.show();
 				}
 			);
 		}
 	});
 });
 
-function show_esign_dialog(frm) {
-	let d = new frappe.ui.Dialog({
-		title: __('Send for eSign'),
-		fields: [
-			{
-				label: __("To"),
-				fieldtype: "MultiSelectPills",
-				reqd: 1,
-				fieldname: "recipients",
-				get_data: function(txt) {
-					return get_contact_list(frm, txt);
-				}
-			},
-			{
-				fieldtype: "Section Break",
-				fieldname: "more_options",
-				label: __("More Options"),
-				collapsible: 1
-			},
-			{
-				label: __("CC"),
-				fieldtype: "MultiSelectPills",
-				fieldname: "cc",
-				get_data: function(txt) {
-					return get_contact_list(frm, txt);
-				}
-			},
-			{
-				label: __("BCC"),
-				fieldtype: "MultiSelectPills",
-				fieldname: "bcc",
-				get_data: function(txt) {
-					return get_contact_list(frm, txt);
-				}
-			},
-			{
-				fieldtype: "Section Break",
-				fieldname: "template_section"
-			},
-			{
-				label: __("Email Template"),
-				fieldtype: "Link",
-				options: "Email Template",
-				fieldname: "email_template",
-				reqd: 1,
-				// get_query: function() {
-				// 	return {
-				// 		filters: {
-				// 			enabled: 1,
-				// 			doc_type: frm.doctype
-				// 		}
-				// 	};
-				// },
-				onchange: function() {
-					if (this.value) {
-						load_email_template(frm, d, this.value);
+class ESignDialog {
+	constructor(frm) {
+		this.frm = frm;
+		this.web_forms = [];
+		this.dialog = null;
+		this.contact_list_cache = [];
+		this.init_dialog();
+	}
+
+	init_dialog() {
+		this.dialog = new frappe.ui.Dialog({
+			title: __('Send for eSign'),
+			fields: [
+				{
+					label: __("To"),
+					fieldtype: "MultiSelect",
+					reqd: 1,
+					fieldname: "recipients",
+					get_data: (txt) => {
+						return this.get_cached_contact_list(txt);
+					}
+				},
+				{
+					fieldtype: "Section Break",
+					fieldname: "more_options",
+					label: __("More Options"),
+					collapsible: 1
+				},
+				{
+					label: __("CC"),
+					fieldtype: "MultiSelect",
+					fieldname: "cc",
+					get_data: (txt) => {
+						return this.get_cached_contact_list(txt);
+					}
+				},
+				{
+					label: __("BCC"),
+					fieldtype: "MultiSelect",
+					fieldname: "bcc",
+					get_data: (txt) => {
+						return this.get_cached_contact_list(txt);
+					}
+				},
+				{
+					fieldtype: "Section Break",
+					fieldname: "template_section"
+				},
+				{
+					label: __("Email Template"),
+					fieldtype: "Link",
+					options: "Email Template",
+					fieldname: "email_template",
+					reqd: 1,
+					get_query: () => ({
+						filters: { esign_request: 1 }
+					}),
+					onchange: () => {
+						const template = this.dialog.get_value('email_template');
+						if (template) {
+							this.load_email_template(template);
+						}
+					}
+				},
+				{
+					label: __("eSign Web Form"),
+					fieldtype: "Select",
+					fieldname: "web_form",
+					reqd: 1,
+					options: [],
+					onchange: () => {
+						this.on_web_form_change();
+					}
+				},
+				{
+					fieldtype: "Section Break"
+				},
+				{
+					label: __("Subject"),
+					fieldtype: "Data",
+					reqd: 1,
+					fieldname: "subject",
+					length: 524288
+				},
+				{
+					label: __("Message"),
+					fieldtype: "Text Editor",
+					fieldname: "content",
+					reqd: 1
+				},
+				{
+					fieldtype: "HTML",
+					fieldname: "esign_link_preview",
+					options: "<p><em>Select a web form to preview the eSign link here.</em></p>"
+				},
+				{
+					fieldtype: "Section Break",
+					fieldname: "options_section"
+				},
+				{
+					label: __("Send me a copy"),
+					fieldtype: "Check",
+					fieldname: "send_me_a_copy"
+				},
+				{
+					label: __("Print Format"),
+					fieldtype: "Link",
+					options: "Print Format",
+					fieldname: "print_format",
+					get_query: () => ({
+						filters: { doc_type: this.frm.doctype }
+					}),
+					onchange: () => {
+						this.update_esign_link_preview();
 					}
 				}
-			},
-			{
-				label: __("eSign Web Form"),
-				fieldtype: "Select",
-				fieldname: "web_form",
-				reqd: 1,
-				options: [],
-				onchange: function() {
-					update_esign_link_preview(d, frm);
-				}
-			},
-			{
-				fieldtype: "Section Break"
-			},
-			{
-				label: __("Subject"),
-				fieldtype: "Data",
-				reqd: 1,
-				fieldname: "subject",
-				length: 524288
-			},
-			{
-				label: __("Message"),
-				fieldtype: "Text Editor",
-				fieldname: "content",
-				reqd: 1
-			},
-			{
-				fieldtype: "Section Break",
-				fieldname: "options_section"
-			},
-			{
-				label: __("Send me a copy"),
-				fieldtype: "Check",
-				fieldname: "send_me_a_copy"
-			},
-			{
-				label: __("Print Format"),
-				fieldtype: "Link",
-				options: "Print Format",
-				fieldname: "print_format",
-				get_query: function() {
-					return {
-						filters: {
-							doc_type: frm.doctype
-						}
-					};
-				}
+			],
+			size: 'large',
+			primary_action_label: __('Send eSign Request'),
+			primary_action: (values) => {
+				this.send_esign_request(values);
+				this.dialog.hide();
 			}
-		],
-		size: 'large',
-		primary_action_label: __('Send eSign Request'),
-		primary_action: function(values) {
-			send_esign_request(frm, values);
-			d.hide();
-		}
-	});
-
-	// Load web forms for this doctype
-	frappe.call({
-		method: "esign.esign.overrides.web_form.get_esign_web_forms",
-		args: { doctype: frm.doctype },
-		callback: function(r) {
-			if (r.message && r.message.length > 0) {
-				let options = r.message.map(wf => wf.name);
-				d.set_df_property('web_form', 'options', [''].concat(options));
-			} else {
-				frappe.msgprint(__("No eSign-enabled web forms found for {0}", [frm.doctype]));
-				d.hide();
-			}
-		}
-	});
-
-	d.show();
-}
-
-function get_contact_list(frm, txt) {
-	// Get email contacts related to the document
-	let contacts = [];
-	
-	// Add customer email if exists
-	if (frm.doc.customer && frm.doc.customer_email) {
-		contacts.push({
-			value: frm.doc.customer_email,
-			description: frm.doc.customer
 		});
 	}
-	
-	// Add supplier email if exists  
-	if (frm.doc.supplier && frm.doc.supplier_email) {
-		contacts.push({
-			value: frm.doc.supplier_email,
-			description: frm.doc.supplier
-		});
-	}
-	
-	// Add contact email if exists
-	if (frm.doc.contact_email) {
-		contacts.push({
-			value: frm.doc.contact_email,
-			description: frm.doc.contact_display || "Contact"
-		});
-	}
-	
-	return contacts.filter(contact => 
-		!txt || contact.value.toLowerCase().includes(txt.toLowerCase())
-	);
-}
 
-function load_email_template(frm, dialog, template_name) {
-	frappe.call({
-		method: "frappe.email.doctype.email_template.email_template.get_email_template",
-		args: {
-			template_name: template_name,
-			doc: frm.doc
-		},
-		callback: function(r) {
-			if (r.message) {
-				dialog.set_value('subject', r.message.subject);
-				dialog.set_value('content', r.message.message);
-			}
-		}
-	});
-}
+	show() {
+		this.load_web_forms();
+	}
 
-function update_esign_link_preview(dialog, frm) {
-	let web_form = dialog.get_value('web_form');
-	let print_format = dialog.get_value('print_format') || 'Standard';
-	
-	if (web_form) {
+	async load_web_forms() {
+		// Load contact list cache first
+		await this.load_contact_list_cache();
+
 		frappe.call({
-			method: "esign.esign.overrides.web_form.get_esign_link",
-			args: {
-				doc: frm.doc,
-				web_form_name: web_form,
-				format_name: print_format
-			},
-			callback: function(r) {
-				if (r.message) {
-					dialog.fields_dict.esign_link_preview.$wrapper.html(
-						`<p><strong>eSign Link:</strong></p>
-						<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; word-break: break-all;">
-							<a href="${r.message}" target="_blank">${r.message}</a>
-						</div>`
-					);
+			method: "esign.esign.overrides.web_form.get_esign_web_forms",
+			args: { doctype: this.frm.doctype },
+			callback: (r) => {
+				if (r.message && r.message.length > 0) {
+					this.web_forms = r.message;
+					const options = this.web_forms.map(wf => ({
+						label: wf.title,
+						value: wf.name
+					}));
+					this.dialog.set_df_property('web_form', 'options', [].concat(options));
+					this.dialog.set_value('web_form', options[0]?.value);
+					this.dialog.show();
+				} else {
+					frappe.msgprint(__("No eSign-enabled web forms found for {0}", [this.frm.doctype]));
 				}
 			}
 		});
 	}
-}
 
-function send_esign_request(frm, values) {
-	frappe.call({
-		method: "esign.esign.send_esign_email",
-		args: {
-			doctype: frm.doctype,
-			name: frm.doc.name,
-			recipients: values.recipients,
-			cc: values.cc || [],
-			bcc: values.bcc || [],
-			subject: values.subject,
-			message: values.content,
-			web_form: values.web_form,
-			print_format: values.print_format,
-			send_me_a_copy: values.send_me_a_copy
-		},
-		freeze: true,
-		freeze_message: __("Sending eSign request..."),
-		callback: function(r) {
-			if (r.message && r.message.success) {
-				frappe.show_alert({
-					message: __("eSign request sent successfully"),
-					indicator: "green"
-				});
-				frm.reload_doc();
+	on_web_form_change() {
+		const web_form_name = this.dialog.get_value('web_form');
+		const web_form = this.web_forms.find(wf => wf.name === web_form_name);
+
+		if (web_form && web_form.print_format) {
+			this.dialog.set_value('print_format', web_form.print_format);
+		}
+
+		this.update_esign_link_preview();
+	}
+
+	async load_contact_list_cache() {
+		let contacts = [];
+
+		// Try custom hook first
+		if (this.frm?.events.get_email_recipients) {
+			try {
+				const custom_contacts = await this.frm.events.get_email_recipients(this.frm, 'recipients')
+				if (custom_contacts && custom_contacts.length > 0) {
+					// Ensure proper format for MultiSelect
+					contacts = custom_contacts.map(email => ({
+						value: email,
+						label: email,
+						description: email
+					}));
+				}
+			} catch (error) {
+				console.error("Error fetching custom email recipients:", error);
 			}
 		}
-	});
+
+		// Fallback to default contact extraction if no custom contacts
+		if (contacts.length === 0) {
+			if (this.frm.doc.customer && this.frm.doc.customer_email) {
+				contacts.push({
+					value: this.frm.doc.customer_email,
+					label: this.frm.doc.customer_email,
+					description: this.frm.doc.customer
+				});
+			}
+
+			if (this.frm.doc.supplier && this.frm.doc.supplier_email) {
+				contacts.push({
+					value: this.frm.doc.supplier_email,
+					label: this.frm.doc.supplier_email,
+					description: this.frm.doc.supplier
+				});
+			}
+
+			if (this.frm.doc.contact_email) {
+				contacts.push({
+					value: this.frm.doc.contact_email,
+					label: this.frm.doc.contact_email,
+					description: this.frm.doc.contact_display || "Contact"
+				});
+			}
+		}
+
+		this.contact_list_cache = contacts;
+	}
+
+	get_cached_contact_list(txt) {
+		// Filter based on search text
+		return this.contact_list_cache.filter(contact =>
+			!txt || contact.value.toLowerCase().includes(txt.toLowerCase())
+		);
+	}
+
+	load_email_template(template_name) {
+		frappe.call({
+			method: "frappe.email.doctype.email_template.email_template.get_email_template",
+			args: {
+				template_name: template_name,
+				doc: this.frm.doc
+			},
+			callback: (r) => {
+				if (r.message) {
+					this.dialog.set_value('subject', r.message.subject);
+					this.dialog.set_value('content', r.message.message);
+				}
+			}
+		});
+	}
+
+	update_esign_link_preview() {
+		const web_form = this.dialog.get_value('web_form');
+		const print_format = this.dialog.get_value('print_format') || 'Standard';
+
+		if (web_form) {
+			frappe.call({
+				method: "esign.esign.overrides.web_form.get_esign_link",
+				args: {
+					doc: this.frm.doc,
+					web_form_name: web_form,
+					print_format_name: print_format
+				},
+				callback: (r) => {
+					if (r.message) {
+						this.dialog.fields_dict.esign_link_preview.$wrapper.html(
+							`<p><strong>eSign Link:</strong></p>
+							<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; word-break: break-all;">
+								<a href="${r.message}" target="_blank">${r.message}</a>
+							</div>`
+						);
+					}
+				}
+			});
+		}
+	}
+
+	send_esign_request(values) {
+		frappe.call({
+			method: "esign.esign.send_esign_email",
+			args: {
+				doctype: this.frm.doctype,
+				name: this.frm.doc.name,
+				recipients: values.recipients,
+				cc: values.cc,
+				bcc: values.bcc,
+				subject: values.subject,
+				message: values.content,
+				web_form: values.web_form,
+				print_format: values.print_format,
+				send_me_a_copy: values.send_me_a_copy
+			},
+			freeze: true,
+			freeze_message: __("Sending eSign request..."),
+			callback: (r) => {
+				if (r.message && r.message.success) {
+					frappe.show_alert({
+						message: __("eSign request sent successfully"),
+						indicator: "green"
+					});
+					this.frm.reload_doc();
+				}
+			}
+		});
+	}
 }

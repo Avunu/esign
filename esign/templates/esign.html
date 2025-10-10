@@ -14,7 +14,7 @@
 {%- block navbar -%}
 <div class="container container-fluid doc-container">
 	<div class="web-form-header">
-		<div class="web-form-head">
+		<div class="web-form-head ml-2">
 			<div class="title">
 				<div class="web-form-title ellipsis">
 					<h1 class="ellipsis">{{ _(title) }}</h1>
@@ -31,8 +31,33 @@
 {%- endblock -%}
 
 {% block content %}
-<!-- Print view iframe -->
-<iframe id="print-view-frame" frameborder="0" src="{{ printview_url }}"></iframe>
+<!-- Print view embedded with Shadow DOM -->
+<div id="print-view-container">
+	<div id="shadow-host">
+		<template shadowrootmode="open">
+			<style>
+				:host {
+					all: initial;
+					display: block;
+				}
+
+					{{ print_style | safe }}
+			</style>
+			<div class="print-format-gutter">
+				<div class="print-format">
+					{{ print_html | safe }}
+				</div>
+			</div>
+		</template>
+	</div>
+</div>
+
+<!-- Fallback: Download PDF link -->
+<div class="text-center mb-3">
+	<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-sm">
+		{{ _("Download PDF") }}
+	</a>
+</div>
 
 <!-- Mobile requirement message and QR code (shown on desktop when force_mobile is true) -->
 {% if force_mobile %}
@@ -134,4 +159,81 @@
 		</div>
 	</div>
 </div>
+
+<script>
+	// Fallback for browsers that don't support declarative shadow DOM
+	if (!HTMLTemplateElement.prototype.hasOwnProperty('shadowRootMode')) {
+		(function attachShadowRoots(root) {
+			root.querySelectorAll("template[shadowrootmode]").forEach(template => {
+				const mode = template.getAttribute("shadowrootmode");
+				const shadowRoot = template.parentNode.attachShadow({ mode });
+				shadowRoot.appendChild(template.content);
+				template.remove();
+				attachShadowRoots(shadowRoot);
+			});
+		})(document);
+	}
+
+	// PDF viewer-style viewport scaling
+	function scaleToFitViewport() {
+		const container = document.getElementById('print-view-container');
+		const shadowHost = document.getElementById('shadow-host');
+
+		if (!shadowHost || !shadowHost.shadowRoot) {
+			return;
+		}
+
+		const printFormat = shadowHost.shadowRoot.querySelector('.print-format');
+		if (!printFormat) {
+			return;
+		}
+
+		// Get the natural width of the print format content
+		const contentWidth = printFormat.scrollWidth;
+
+		// Get the available viewport width (minus padding/margins)
+		const viewportWidth = window.innerWidth;
+		const containerPadding = 40; // Account for margins and padding
+		const availableWidth = viewportWidth - containerPadding;
+
+		// Calculate scale factor
+		let scale = 100;
+		if (contentWidth > availableWidth) {
+			console.debug(`Content width (${contentWidth}px) exceeds available width (${availableWidth}px). Scaling down.`);
+			scale = 100 * (availableWidth / contentWidth);
+		}
+
+		// Apply the scale transformation
+		printFormat.style.zoom = `${scale}%`;
+	}
+
+	// Initialize scaling after content loads
+	function initializeScaling() {
+		// Wait for shadow DOM content to fully render
+		setTimeout(() => {
+			scaleToFitViewport();
+		}, 100);
+	}
+
+	// Run on load
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initializeScaling);
+	} else {
+		initializeScaling();
+	}
+
+	// Re-scale on window resize with debouncing
+	let resizeTimeout;
+	window.addEventListener('resize', () => {
+		clearTimeout(resizeTimeout);
+		resizeTimeout = setTimeout(scaleToFitViewport, 150);
+	});
+
+	// Re-scale when fonts are loaded
+	if (document.fonts) {
+		document.fonts.ready.then(() => {
+			setTimeout(scaleToFitViewport, 100);
+		});
+	}
+</script>
 {% endblock %}
