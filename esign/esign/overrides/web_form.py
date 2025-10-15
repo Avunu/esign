@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 import json
 from frappe.types import DF
 from frappe.website.doctype.web_form.web_form import WebForm as BaseWebForm
@@ -244,7 +245,7 @@ def attach_print_to_document(doc, print_format: str, request_data: RequestData):
     print_data = attach_print(
         doctype=doc.doctype,
         name=doc.name,
-        file_name=f"{doc.name}_filled_{datetime.now()}.pdf",
+        file_name=f"{doc.name}_filled_{datetime.now()}",
         print_format=print_format,
         doc=doc,
         print_letterhead=False,
@@ -264,6 +265,8 @@ def attach_print_to_document(doc, print_format: str, request_data: RequestData):
     )
 
     file_doc.save(ignore_permissions=True)
+
+    doc.add_comment("Comment", _(f"eSign document attached: {print_data['fname']}"))
 
 
 def extract_param_from_referrer(param: str = "") -> str:

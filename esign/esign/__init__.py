@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import now
 from frappe.core.doctype.communication.communication import Communication
 
 
@@ -98,26 +99,11 @@ def send_esign_email(
         email_content += link_html
 
     try:
-        # # Send the email
-        # frappe.sendmail(
-        #     recipients=recipients_list,
-        #     cc=cc_list or None,
-        #     bcc=bcc_list or None,
-        #     subject=subject,
-        #     message=email_content,
-        #     reference_doctype=doctype,
-        #     reference_name=name,
-        #     send_after=None,
-        #     expose_recipients="header",
-        #     print_letterhead=False,
-        #     # communication_type="Automated Message"
-        # )
-
         # Create communication record
         comm = Communication(
             {
                 "doctype": "Communication",
-                "communication_type": "Communication",
+                "communication_type": "Automated Message",
                 "communication_medium": "Email",
                 "sent_or_received": "Sent",
                 "email_status": "Open",
@@ -132,31 +118,24 @@ def send_esign_email(
                 "status": "Linked",
                 "email_template": None,
                 "has_attachment": 0,
-                "communication_date": frappe.utils.now(),
+                "communication_date": now(),
             }
         )
         comm.insert(ignore_permissions=True)
-
-        comm.send_email(
+        
+        # Send the email
+        send_mail_args = comm.sendmail_input_dict(
             print_html=None,
             print_format=print_format,
             send_me_a_copy=send_me_a_copy,
             print_letterhead=False,
+            is_inbound_mail_communcation=False,
             print_language=None,
         )
 
-        # Add comment to the document
-        doc.add_comment(
-            "Comment", _("eSign request sent to {0}").format(", ".join(recipients_list))
-        )
+        send_mail_args["content"] = email_content
 
-        frappe.msgprint(
-            _("eSign request sent successfully to {0}").format(
-                ", ".join(recipients_list)
-            ),
-            title=_("Email Sent"),
-            indicator="green",
-        )
+        frappe.sendmail(now=True, **send_mail_args)
 
         return {
             "success": True,
