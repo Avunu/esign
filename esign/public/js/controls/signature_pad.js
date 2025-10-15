@@ -1,4 +1,4 @@
-import SignaturePad from 'signature_pad';
+import SignaturePad from "signature_pad";
 
 export class ControlSignaturePad extends frappe.ui.form.ControlData {
 	make() {
@@ -11,8 +11,8 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 			$(this.wrapper).find("label").text(__(this.df.label, null, this.df.parent));
 		}
 
-		me.body = document.createElement('div');
-		me.body.className = 'signature-field';
+		me.body = document.createElement("div");
+		me.body.className = "signature-field";
 		me.$input_wrapper[0].prepend(me.body);
 
 		new ResizeObserver(() => me.make_pad()).observe(this.body);
@@ -22,35 +22,36 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		let width = this.body.offsetWidth;
 		if (width > 0 && !this.signature_pad) {
 			// Create canvas with proper dimensions
-			this.canvas = document.createElement('canvas');
+			this.canvas = document.createElement("canvas");
 			this.canvas.width = 600;
 			this.canvas.height = 200;
-			this.canvas.style.cssText = 'display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); touch-action: none;';
+			this.canvas.style.cssText =
+				"display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); touch-action: none;";
 			this.body.appendChild(this.canvas);
 
 			// Initialize signature_pad with options
 			this.signature_pad = new SignaturePad(this.canvas, {
-				backgroundColor: 'transparent',
-				penColor: 'black',
+				backgroundColor: "transparent",
+				penColor: "black",
 				minWidth: 1,
 				maxWidth: 2.5,
 			});
 
 			// Handle signature changes
-			this.signature_pad.addEventListener('endStroke', () => {
+			this.signature_pad.addEventListener("endStroke", () => {
 				this.on_save_sign();
 			});
 
 			// Create clear button
-			const buttonWrapper = document.createElement('div');
-			buttonWrapper.className = 'signature-btn-row';
+			const buttonWrapper = document.createElement("div");
+			buttonWrapper.className = "signature-btn-row";
 			buttonWrapper.innerHTML = `
 				<a href="#" type="button" class="signature-reset btn icon-btn">
 					${frappe.utils.icon("es-line-reload", "sm")}
 				</a>
 			`;
-			buttonWrapper.addEventListener('click', (e) => {
-				if (e.target.closest('.signature-reset')) {
+			buttonWrapper.addEventListener("click", (e) => {
+				if (e.target.closest(".signature-reset")) {
 					e.preventDefault();
 					this.on_reset_sign();
 					return false;
@@ -67,14 +68,14 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 	on_save_sign() {
 		if (this.saving || this.loading) return;
 		if (!this.signature_pad.isEmpty()) {
-			const dataUrl = this.canvas.toDataURL('image/png');
+			const dataUrl = this.canvas.toDataURL("image/png");
 			this.set_my_value(dataUrl);
 		}
 	}
 
 	on_reset_sign() {
 		this.signature_pad.clear();
-		this.set_my_value('');
+		this.set_my_value("");
 	}
 
 	set_my_value(value) {
@@ -123,9 +124,9 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		this.make_pad();
 
 		// Hide the default input wrapper
-		const controlInput = this.$wrapper?.[0]?.querySelector?.('.control-input');
+		const controlInput = this.$wrapper?.[0]?.querySelector?.(".control-input");
 		if (controlInput) {
-			controlInput.style.display = 'none';
+			controlInput.style.display = "none";
 		}
 
 		// Load current value

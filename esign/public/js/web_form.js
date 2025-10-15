@@ -16,11 +16,7 @@ frappe.ui.form.on("Web Form", {
 				.fields.filter((field) => !frappe.model.no_value_type.includes(field.fieldtype))
 				.map((field) => field.fieldname);
 
-			frm.set_df_property(
-				"esign_update_field",
-				"options",
-				[""].concat(fieldnames)
-			);
+			frm.set_df_property("esign_update_field", "options", [""].concat(fieldnames));
 		});
 	},
 });

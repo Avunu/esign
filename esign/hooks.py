@@ -10,24 +10,24 @@ app_include_css = ["esign.control.bundle.css"]
 
 
 doctype_js = {
-    "Web Form": "public/js/web_form.js",
+	"Web Form": "public/js/web_form.js",
 }
 
 override_doctype_class = {
-    "Web Form": "esign.esign.overrides.web_form.ExtendedWebForm",
-    "Email Template": "esign.esign.overrides.email_template.ExtendedEmailTemplate",
+	"Web Form": "esign.esign.overrides.web_form.ExtendedWebForm",
+	"Email Template": "esign.esign.overrides.email_template.ExtendedEmailTemplate",
 }
 
 doc_events = {
-    "*": {
-        "on_update": [
-            "esign.esign.overrides.web_form.on_update_esign_document",
-        ],
-    }
+	"*": {
+		"on_update": [
+			"esign.esign.overrides.web_form.on_update_esign_document",
+		],
+	}
 }
 
 jinja = {
-    "methods": [
-        "esign.esign.overrides.web_form.get_esign_link",
-    ]
+	"methods": [
+		"esign.esign.overrides.web_form.get_esign_link",
+	]
 }

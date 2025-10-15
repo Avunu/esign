@@ -1,11 +1,11 @@
-$(document).on('form-load', function (event, frm) {
-	frappe.db.count("Web Form", { filters: { "doc_type": frm.doctype, "esign_enabled": 1 }, limit: 1 }).then((exists) => {
-		console.log("exists", exists);
-		if (exists) {
-			// add "Send for eSign" button
-			frm.add_custom_button(
-				__("Send for eSign"),
-				function () {
+$(document).on("form-load", function (event, frm) {
+	frappe.db
+		.count("Web Form", { filters: { doc_type: frm.doctype, esign_enabled: 1 }, limit: 1 })
+		.then((exists) => {
+			console.log("exists", exists);
+			if (exists) {
+				// add "Send for eSign" button
+				frm.add_custom_button(__("Send for eSign"), function () {
 					frappe.call({
 						method: "esign.esign.doctype.esign_request.esign_request.create_esign_request",
 						args: {
@@ -23,8 +23,7 @@ $(document).on('form-load', function (event, frm) {
 							}
 						},
 					});
-				}
-			);
-		}
-	});
+				});
+			}
+		});
 });
