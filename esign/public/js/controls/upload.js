@@ -21,17 +21,14 @@ export class ControlUpload extends frappe.ui.form.ControlData {
 			this.file_input.click();
 		});
 		this.input_area.prepend(button);
-		this.$input = $(button); // Keep for Frappe compatibility
+		this.$input = $(button);
 
 		// Create preview area
 		const preview = document.createElement("div");
 		preview.className = "upload-preview";
-		preview.style.cssText = "margin-top: 10px; display: none;";
 
 		this.preview_img = document.createElement("img");
 		this.preview_img.className = "upload-preview-img";
-		this.preview_img.style.cssText =
-			"max-width: 100%; max-height: 200px; border: 1px solid var(--border-color); border-radius: var(--border-radius);";
 		preview.appendChild(this.preview_img);
 
 		this.input_area.appendChild(preview);
@@ -60,10 +57,10 @@ export class ControlUpload extends frappe.ui.form.ControlData {
 	set_preview(dataurl) {
 		if (dataurl) {
 			this.preview_img.src = dataurl;
-			this.preview_element.style.display = "";
+			this.preview_element.classList.add("active");
 			this.$input.textContent = __("Change");
 		} else {
-			this.preview_element.style.display = "none";
+			this.preview_element.classList.remove("active");
 			this.$input.textContent = __("Upload");
 		}
 	}

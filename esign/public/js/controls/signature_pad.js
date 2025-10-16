@@ -24,7 +24,7 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 			// Create canvas with proper dimensions
 			this.canvas = document.createElement("canvas");
 			this.canvas.width = 750;
-			this.canvas.height = 200;
+			this.canvas.height = 292;
 			// this.canvas.style.cssText =
 			// 	"display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); touch-action: none;";
 			this.body.appendChild(this.canvas);

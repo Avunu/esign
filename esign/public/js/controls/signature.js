@@ -53,39 +53,47 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		// make a pointer to value
 		this.value = this.get_value();
 
-		// Create button container
-		this.button_wrapper = document.createElement("div");
-		this.button_wrapper.className = "signature-button-wrapper";
-		this.$input_wrapper[0].prepend(this.button_wrapper);
+		// Create signature canvas container
+		this.canvas_container = document.createElement("div");
+		this.canvas_container.className = "signature-canvas-container";
+		this.$input_wrapper[0].prepend(this.canvas_container);
 
-		// Create image display container
-		this.img_wrapper = document.createElement("div");
-		this.img_wrapper.className = "signature-display";
+		// Create canvas for displaying signature
+		this.display_canvas = document.createElement("canvas");
+		this.display_canvas.width = 750;
+		this.display_canvas.height = 292;
+		this.canvas_container.appendChild(this.display_canvas);
 
-		this.missing_image = document.createElement("div");
-		this.missing_image.className = "missing-image attach-missing-image";
-		this.missing_image.innerHTML = frappe.utils.icon("restriction", "md");
-		this.img_wrapper.appendChild(this.missing_image);
+		// Create overlay
+		this.overlay = document.createElement("div");
+		this.overlay.className = "signature-overlay";
+		this.canvas_container.appendChild(this.overlay);
 
-		this.$input_wrapper[0].prepend(this.img_wrapper);
+		// Create overlay text
+		this.overlay_text = document.createElement("div");
+		this.overlay_text.className = "signature-overlay-text";
+		this.overlay.appendChild(this.overlay_text);
 
-		this.img = document.createElement("img");
-		this.img.className = "img-responsive attach-image-display";
-		this.img.style.display = "none";
-		this.img_wrapper.appendChild(this.img);
-
-		this.make_signature_button();
-	}
-
-	make_signature_button() {
-		this.add_button = document.createElement("button");
-		this.add_button.className = "btn btn-default btn-sm";
-		this.add_button.textContent = __("Add your signature");
-		this.add_button.addEventListener("click", (e) => {
-			e.preventDefault();
-			this.show_signature_dialog();
+		// Add hover effect
+		this.canvas_container.addEventListener("mouseenter", () => {
+			if (this.get_status() === "Write") {
+				this.overlay.style.opacity = "1";
+			}
 		});
-		this.button_wrapper.appendChild(this.add_button);
+
+		this.canvas_container.addEventListener("mouseleave", () => {
+			this.overlay.style.opacity = "0";
+		});
+
+		// Add click handler
+		this.canvas_container.addEventListener("click", (e) => {
+			if (this.get_status() === "Write") {
+				e.preventDefault();
+				this.show_signature_dialog();
+			}
+		});
+
+		this.refresh_input();
 	}
 
 	show_signature_dialog() {
@@ -137,14 +145,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				const current_tab = signature_dialog.frm.active_tab?.df.fieldname || null;
 
 				if (current_tab === "tab_draw") {
-					// Access the signature field and get data from signature_pad
 					const signature_field = signature_dialog.fields_dict.signature_draw;
 					let signature_data;
 
 					if (signature_field && signature_field.signature_pad) {
-						// Check if signature pad has content
 						if (!signature_field.signature_pad.isEmpty()) {
-							// Get data directly from signature_pad canvas
 							signature_data = signature_field.canvas.toDataURL("image/png");
 						}
 					}
@@ -168,7 +173,6 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				} else if (current_tab === "tab_upload") {
 					let uploaded_signature = signature_dialog.get_value("signature_upload");
 					if (uploaded_signature) {
-						// Map uploaded image to canvas with consistent dimensions
 						me.map_upload_to_canvas(uploaded_signature).then((base64) => {
 							me.set_signature_value(base64, "upload");
 							signature_dialog.hide();
@@ -182,9 +186,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			},
 		});
 
-		// Store reference for debugging
 		this.signature_dialog = signature_dialog;
-
 		signature_dialog.header.hide();
 		signature_dialog.show();
 	}
@@ -194,7 +196,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			// Create a canvas to render the typed text
 			const canvas = document.createElement("canvas");
 			canvas.width = 750;
-			canvas.height = 200;
+			canvas.height = 292;
 			const ctx = canvas.getContext("2d");
 
 			// Set background to transparency
@@ -222,7 +224,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			// Create canvas with consistent dimensions (same as typed signature)
 			const canvas = document.createElement("canvas");
 			canvas.width = 750;
-			canvas.height = 200;
+			canvas.height = 292;
 			const ctx = canvas.getContext("2d");
 
 			// Set transparent background
@@ -278,8 +280,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	}
 
 	refresh_input() {
-		// Don't use the parent's refresh_input
-		if (!this.button_wrapper) return;
+		if (!this.canvas_container) return;
 
 		// Hide the actual input field (created by parent ControlData)
 		if (this.input_area) {
@@ -289,16 +290,27 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		const value = this.get_value();
 		const can_write = this.get_status() === "Write";
 
-		if (value) {
-			// Show signature image
-			this.set_image(value);
-			this.button_wrapper.style.display = can_write ? "" : "none";
-			this.add_button.textContent = __("Change signature");
+		// Update canvas display
+		this.render_signature(value);
+
+		// Update overlay text and interaction
+		if (can_write) {
+			this.canvas_container.classList.remove("readonly");
+			
+			if (value) {
+				this.overlay_text.innerHTML = `
+					${frappe.utils.icon("edit", "md")}
+					<div style="margin-top: 8px;">${__("Change signature")}</div>
+				`;
+			} else {
+				this.overlay_text.innerHTML = `
+					${frappe.utils.icon("add", "md")}
+					<div style="margin-top: 8px;">${__("Add your signature")}</div>
+				`;
+			}
 		} else {
-			// Show add button only if editable
-			this.img_wrapper.style.display = "none";
-			this.button_wrapper.style.display = can_write ? "" : "none";
-			this.add_button.textContent = __("Add your signature");
+			this.canvas_container.classList.add("readonly");
+			this.overlay.style.opacity = "0";
 		}
 
 		if (this.get_status() === "Read" && this.disp_area) {
@@ -306,16 +318,37 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		}
 	}
 
-	set_image(value) {
+	render_signature(value) {
+		const ctx = this.display_canvas.getContext("2d");
+
+		// Clear canvas
+		ctx.clearRect(0, 0, this.display_canvas.width, this.display_canvas.height);
+
 		if (value) {
-			this.missing_image.style.display = "none";
-			this.img.src = value;
-			this.img.style.display = "";
-			this.img_wrapper.style.display = "";
+			// Load and draw signature
+			const img = new Image();
+			img.onload = () => {
+				ctx.drawImage(img, 0, 0, this.display_canvas.width, this.display_canvas.height);
+			};
+			img.src = value;
 		} else {
-			this.missing_image.style.display = "";
-			this.img.style.display = "none";
-			this.img_wrapper.style.display = "none";
+			// Draw empty state with dashed border
+			ctx.setLineDash([5, 5]);
+			ctx.strokeStyle = "var(--border-color)";
+			ctx.lineWidth = 2;
+			ctx.strokeRect(10, 10, this.display_canvas.width - 20, this.display_canvas.height - 20);
+			ctx.setLineDash([]);
+
+			// Draw placeholder text
+			ctx.fillStyle = "var(--text-muted)";
+			ctx.font = "16px var(--font-stack)";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(
+				__("No signature"),
+				this.display_canvas.width / 2,
+				this.display_canvas.height / 2
+			);
 		}
 	}
 
