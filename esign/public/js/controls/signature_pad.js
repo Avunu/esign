@@ -23,18 +23,16 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		if (width > 0 && !this.signature_pad) {
 			// Create canvas with proper dimensions
 			this.canvas = document.createElement("canvas");
-			this.canvas.width = 600;
+			this.canvas.width = 750;
 			this.canvas.height = 200;
-			this.canvas.style.cssText =
-				"display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); touch-action: none;";
+			// this.canvas.style.cssText =
+			// 	"display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); touch-action: none;";
 			this.body.appendChild(this.canvas);
 
 			// Initialize signature_pad with options
 			this.signature_pad = new SignaturePad(this.canvas, {
 				backgroundColor: "transparent",
 				penColor: "black",
-				minWidth: 1,
-				maxWidth: 2.5,
 			});
 
 			// Handle signature changes

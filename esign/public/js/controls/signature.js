@@ -193,21 +193,13 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		return new Promise((resolve) => {
 			// Create a canvas to render the typed text
 			const canvas = document.createElement("canvas");
-			canvas.width = 600;
+			canvas.width = 750;
 			canvas.height = 200;
 			const ctx = canvas.getContext("2d");
 
 			// Set background to transparency
 			ctx.fillStyle = "transparent";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-			// Draw signature line
-			ctx.strokeStyle = "#777777ff";
-			ctx.lineWidth = 2;
-			ctx.beginPath();
-			ctx.moveTo(70, canvas.height - 70);
-			ctx.lineTo(canvas.width - 70, canvas.height - 70);
-			ctx.stroke();
 
 			// Set text properties
 			ctx.fillStyle = "#000000";
@@ -229,7 +221,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		return new Promise((resolve, reject) => {
 			// Create canvas with consistent dimensions (same as typed signature)
 			const canvas = document.createElement("canvas");
-			canvas.width = 600;
+			canvas.width = 750;
 			canvas.height = 200;
 			const ctx = canvas.getContext("2d");
 
