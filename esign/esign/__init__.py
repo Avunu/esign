@@ -23,12 +23,6 @@ def can_esign(doctype: str, doc: str | dict) -> bool:
         "Web Form", dn={"doc_type": doctype, "published": 1, "esign_enabled": 1}
     )
 
-    # debug
-    frappe.log_error(
-        title=f"eSign: can_esign check for {doctype}",
-        message=f"eSign Web Form found: {esign_web_form}",
-    )
-
     if esign_web_form:
         return True
 
