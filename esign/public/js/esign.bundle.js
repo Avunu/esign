@@ -1,4 +1,4 @@
-$(document).on("form-load", function (event, frm) {
+$(document).on("form-refresh", function (event, frm) {
 	frappe.call("esign.esign.can_esign", {
 		doctype: frm.doctype,
 		doc: frm.doc,
