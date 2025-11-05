@@ -23,8 +23,6 @@ async function initializeESignControls() {
 		frappe.ui.form.ControlSignaturePad = signaturePadModule.ControlSignaturePad;
 		frappe.ui.form.ControlUpload = uploadModule.ControlUpload;
 		frappe.ui.form.ControlSignature = signatureModule.ControlSignature;
-
-		console.log("eSign controls registered successfully");
 	} catch (error) {
 		console.error("Failed to load eSign controls:", error);
 	}
