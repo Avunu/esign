@@ -41,7 +41,12 @@
 					display: block;
 				}
 
-					{{ print_style | safe }}
+				.print-format {
+					margin-left: auto !important;
+					margin-right: auto !important;
+				}
+
+				{{ print_style | safe }}
 			</style>
 			<div class="print-format-gutter">
 				<div class="print-format">
