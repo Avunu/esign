@@ -3,26 +3,10 @@
 @import "~bootstrap/scss/mixins/breakpoints";
 
 @media screen {
-	body {
+	:root {
 		display: block !important;
 		overflow-x: clip !important;
 		overflow-y: scroll !important;
-	}
-
-	.tooltip-content {
-		display: none !important;
-	}
-
-	#print-view-container {
-		width: 100%;
-		min-height: 50vh;
-		max-height: 80vh;
-		border: none;
-		border: 1px solid #d1d8dd;
-		margin-bottom: 2rem;
-		overflow-x: clip;
-		overflow-y: scroll;
-		touch-action: pinch-zoom;
 	}
 
 	.mobile-required-message {
@@ -31,6 +15,27 @@
 		.qr-code-container {
 			margin: 1rem 0;
 		}
+	}
+
+	.tooltip-content {
+		display: none !important;
+	}
+
+	.print-format {
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+
+	#print-view-container {
+		width: 100%;
+		min-height: 80vh;
+		max-height: 80vh;
+		border: none;
+		border: 1px solid #d1d8dd;
+		margin-bottom: 2rem;
+		overflow-x: clip;
+		overflow-y: scroll;
+		touch-action: pinch-zoom;
 	}
 
 	// Hide desktop content on mobile devices when force_mobile is true

@@ -300,7 +300,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			if (value) {
 				this.overlay_text.innerHTML = `
 					${frappe.utils.icon("edit", "md")}
-					<div style="margin-top: 8px;">${__("Change signature")}</div>
+					<div style="margin-top: 8px;">${__("Replace signature")}</div>
 				`;
 			} else {
 				this.overlay_text.innerHTML = `
@@ -338,21 +338,14 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			ctx.lineWidth = 2;
 			ctx.strokeRect(10, 10, this.display_canvas.width - 20, this.display_canvas.height - 20);
 			ctx.setLineDash([]);
-
-			// Draw placeholder text
-			ctx.fillStyle = "var(--text-muted)";
-			ctx.font = "16px var(--font-stack)";
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
-			ctx.fillText(
-				__("No signature"),
-				this.display_canvas.width / 2,
-				this.display_canvas.height / 2
-			);
 		}
 	}
 
 	get_value() {
-		return this.value || this.get_model_value();
+		const value = this.value || this.get_model_value();
+		if (value == "/assets/frappe/images/signature-placeholder.png") {
+			return "";
+		}
+		return value;
 	}
 }
