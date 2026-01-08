@@ -28,14 +28,24 @@
 
 	#print-view-container {
 		width: 100%;
+		// max-width: 1024px;
 		min-height: 80vh;
 		max-height: 80vh;
 		border: none;
 		border: 1px solid #d1d8dd;
-		margin-bottom: 2rem;
+		margin: 0 auto 2rem auto;
 		overflow-x: clip;
 		overflow-y: scroll;
 		touch-action: pinch-zoom;
+		/* For Internet Explorer and Edge */
+		-ms-overflow-style: none;
+		/* For Firefox */
+		scrollbar-width: none;
+	}
+
+	/* For Chrome, Safari, and Opera (WebKit browsers) */
+	#print-view-container::-webkit-scrollbar {
+		display: none;
 	}
 
 	// Hide desktop content on mobile devices when force_mobile is true
