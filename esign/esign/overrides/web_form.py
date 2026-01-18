@@ -26,7 +26,7 @@ class RequestData(TypedDict):
 	method: str | None
 
 
-class ExtendedWebForm(PaymentWebForm, BaseWebForm):
+class EsignWebForm(PaymentWebForm, BaseWebForm):
 	"""Custom WebForm override for eSign-specific functionality with custom field types"""
 
 	# Custom fields from ../custom/web_form.json
@@ -65,7 +65,7 @@ class ExtendedWebForm(PaymentWebForm, BaseWebForm):
 			print_format=print_format_doc,  # type: ignore
 			meta=meta,
 			trigger_print=False,
-			no_letterhead=frappe.form_dict.get("no_letterhead"),
+			no_letterhead=bool(frappe.form_dict.get("no_letterhead")),
 			letterhead=frappe.form_dict.get("letterhead"),
 			settings=None,
 		)
@@ -159,7 +159,7 @@ def on_update_esign_document(doc, method):
 	if not web_form_name:
 		return
 
-	web_form = ExtendedWebForm("Web Form", web_form_name)
+	web_form = EsignWebForm("Web Form", web_form_name)
 	# Only proceed if eSign is enabled and the doc type matches
 	if not web_form.esign_enabled or not web_form.doc_type == doc.doctype:
 		return
@@ -305,7 +305,7 @@ def get_esign_link(doc: "Document", web_form_name: str, print_format_name: str =
 			return str(e)
 
 	try:
-		web_form = ExtendedWebForm("Web Form", web_form_name)
+		web_form = EsignWebForm("Web Form", web_form_name)
 		if not web_form.esign_enabled or not web_form.doc_type == doc.doctype:
 			return ""
 

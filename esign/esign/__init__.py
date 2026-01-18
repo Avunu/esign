@@ -60,10 +60,10 @@ def send_esign_email(
         frappe.throw(_("Document {0} {1} not found").format(doctype, name))
 
     # Validate web form
-    from esign.esign.overrides.web_form import ExtendedWebForm, get_esign_link
+    from esign.esign.overrides.web_form import EsignWebForm, get_esign_link
 
     try:
-        web_form_doc = ExtendedWebForm("Web Form", web_form)
+        web_form_doc = EsignWebForm("Web Form", web_form)
         if not web_form_doc.esign_enabled or web_form_doc.doc_type != doctype:
             frappe.throw(_("Invalid eSign web form for this document type"))
     except frappe.DoesNotExistError:
