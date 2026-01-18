@@ -3,7 +3,7 @@ from frappe.email.doctype.email_template.email_template import EmailTemplate
 from frappe.types import DF
 
 
-class ExtendedEmailTemplate(EmailTemplate):
+class EsignEmailTemplate(EmailTemplate):
 	# Custom fields from ../custom/email_template.json
 	esign_request: DF.Check | None
 
