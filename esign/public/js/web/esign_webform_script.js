@@ -18,6 +18,45 @@ frappe.ui.form.ControlUpload = ControlUpload;
 frappe.ui.form.ControlSignature = ControlSignature;
 
 class EsignWebForm extends WebForm {
+	handle_success(data) {
+		// Override to use eSign success card in sidebar
+		const formCard = document.querySelector(".esign-form-card");
+		const successCard = document.getElementById("esign-success-card");
+
+		if (formCard && successCard) {
+			// Hide the form card, show the success card
+			formCard.classList.add("hide");
+			successCard.classList.remove("hide");
+
+			// Handle redirect if success_url is set
+			if (this.success_url) {
+				this.handle_redirect();
+			}
+		} else {
+			// Fallback to parent behavior
+			super.handle_success(data);
+		}
+	}
+
+	handle_redirect() {
+		// Countdown and redirect
+		const timeSpan = document.querySelector(".esign-redirect-message .time");
+		if (!timeSpan) {
+			window.location.href = this.success_url;
+			return;
+		}
+
+		let countdown = 5;
+		const interval = setInterval(() => {
+			countdown--;
+			timeSpan.textContent = countdown;
+			if (countdown <= 0) {
+				clearInterval(interval);
+				window.location.href = this.success_url;
+			}
+		}, 1000);
+	}
+
 	save() {
 		// Use eSign accept endpoint if esign_enabled, otherwise use default
 		let method = this.esign_enabled
@@ -102,6 +141,12 @@ class EsignWebForm extends WebForm {
 frappe.ready(function () {
 	let web_form_doc = frappe.web_form_doc;
 	let reference_doc = frappe.reference_doc;
+
+	// If document is already completed/signed, don't initialize the form
+	if (frappe.is_completed) {
+		console.debug("Document already signed, skipping form initialization");
+		return;
+	}
 
 	show_login_prompt();
 

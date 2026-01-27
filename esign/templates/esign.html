@@ -12,172 +12,139 @@
 {% endblock %}
 
 <!-- clear the header and footer -->
-{%- block navbar -%}
-<div class="container container-fluid doc-container">
-	<div class="web-form-header">
-		<div class="web-form-head ml-2">
-			<div class="title">
-				<div class="web-form-title ellipsis">
-					<h1 class="ellipsis">{{ _(title) }}</h1>
-				</div>
-			</div>
-			{% if introduction_text %}
-			<div class="web-form-introduction">{{ introduction_text }}</div>
-			{% endif %}
-		</div>
-	</div>
-</div>
-{%- endblock -%}
-{%- block footer -%}
-{%- endblock -%}
+{%- block navbar -%}{%- endblock -%}
+{%- block footer -%}{%- endblock -%}
 
 {% block content %}
-<!-- Print view embedded with Shadow DOM -->
-<div id="print-view-container">
-	<div id="shadow-host">
-		<template shadowrootmode="open">
-			<style>
-				:host {
-					all: initial;
-					display: block;
-				}
+<div class="esign-layout {{ 'esign-completed' if is_completed else '' }} {{ 'esign-force-mobile' if force_mobile else '' }}">
+	<!-- Header -->
+	<header class="esign-header">
+		<div class="esign-header-content">
+			<h1 class="esign-title">{{ _(title) }}</h1>
+			{% if introduction_text and not is_completed %}
+			<p class="esign-subtitle">{{ introduction_text }}</p>
+			{% endif %}
+		</div>
+		<div class="esign-header-actions">
+			{% if not is_completed %}
+			<button type="button" class="btn btn-primary btn-sm esign-scroll-to-form d-lg-none">
+				{{ _("Sign Now") }}
+			</button>
+			{% endif %}
+			<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-sm">
+				<svg class="icon icon-sm"><use href="#icon-download"></use></svg>
+				<span class="d-none d-sm-inline">{{ _("Download PDF") }}</span>
+				<span class="d-sm-none">{{ _("PDF") }}</span>
+			</a>
+		</div>
+	</header>
 
-				.print-format {
-					margin-left: auto !important;
-					margin-right: auto !important;
-				}
-
-				#footer-html {
-					display: none;
-				}
-
-				{{ print_style | safe }}
-			</style>
-			<div class="print-format-gutter">
-				<div class="print-format">
-					{{ print_html | safe }}
+	<!-- Main Content Area -->
+	<div class="esign-main">
+		<!-- Document Viewer (Center/Left) -->
+		<div class="esign-document-pane">
+			<div id="print-view-container">
+				<div id="shadow-host">
+					<template shadowrootmode="open">
+						<style>
+							:host {
+								all: initial;
+								display: block;
+							}
+							.print-format {
+								margin-left: auto !important;
+								margin-right: auto !important;
+							}
+							#footer-html {
+								display: none;
+							}
+							{{ print_style | safe }}
+						</style>
+						<div class="print-format-gutter">
+							<div class="print-format">
+								{{ print_html | safe }}
+							</div>
+						</div>
+					</template>
 				</div>
 			</div>
-		</template>
-	</div>
-</div>
-
-<!-- Fallback: Download PDF link -->
-<div class="text-center mb-3">
-	<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-sm">
-		{{ _("Download PDF") }}
-	</a>
-</div>
-
-<!-- Mobile requirement message and QR code (shown on desktop when force_mobile is true) -->
-{% if force_mobile and not is_completed %}
-<div class="mobile-required-message d-md-block d-none">
-	<div class="alert alert-info text-center p-4">
-		<h4 class="mb-3">{{ _("📱 Touch Screen Required") }}</h4>
-		<p class="mb-3">{{ _("This signature form requires a touch screen device. Please scan the QR code below with
-			your mobile device to continue.") }}</p>
-		<div class="qr-code-container d-flex justify-content-center">
-			<img src="data:image/svg+xml;base64,{{qrcode_svg}}">
 		</div>
-		<small class="text-muted mt-2 d-block">{{ _("Scan with your phone's camera to open this page on your mobile
-			device.") }}</small>
-	</div>
-</div>
-{% endif %}
 
-<!-- web form container -->
-<div data-doctype="Web Form" class="{{ 'hide-mobile' if force_mobile else '' }}">
-	<div class="page-content-wrapper">
-		<div class="container container-fluid doc-container">
-			<div class="web-form-container">
+		<!-- Sidebar (Right) - Form or Success -->
+		<aside class="esign-sidebar" data-doctype="Web Form">
+			{% if is_completed %}
+			<!-- Success State -->
+			<div class="esign-success-card">
+				<div class="esign-success-icon">
+					<svg class="icon icon-xl"><use href="#icon-solid-success"></use></svg>
+				</div>
+				<h2 class="esign-success-title">{{ _("Document Signed") }}</h2>
+				<p class="esign-success-message">{{ _("This document has been signed. Thank you!") }}</p>
+			</div>
+			{% else %}
+			<!-- Mobile QR Code (shown on desktop when force_mobile is true) -->
+			{% if force_mobile %}
+			<div class="esign-qr-card d-none d-lg-block">
+				<div class="esign-qr-icon">📱</div>
+				<h3>{{ _("Touch Screen Required") }}</h3>
+				<p>{{ _("Scan with your mobile device to sign.") }}</p>
+				<div class="esign-qr-code">
+					<img src="data:image/svg+xml;base64,{{qrcode_svg}}" alt="QR Code">
+				</div>
+			</div>
+			{% endif %}
 
-				{% if not is_completed %}
-				<h4 class="mb-3 col-sm-12">{{ _("Fill and Sign") }}</h4>
+			<!-- Form Card -->
+			<div class="esign-form-card {{ 'd-lg-none' if force_mobile else '' }}">
+				<div class="esign-form-header">
+					<h3>{{ _("Fill and Sign") }}</h3>
+				</div>
 
-				<!-- web form -->
-				<form role="form" class="web-form">
-					<div class="web-form-body">
+				<form role="form" class="web-form esign-form">
+					<div class="esign-form-body">
 						<div class="web-form-wrapper">
 							{% include "website/doctype/web_form/templates/web_form_skeleton.html" %}
 						</div>
 					</div>
-					<div class="web-form-footer">
-						<div class="flex justify-flex-end align-flex-end col-sm-12">
-							<button type="submit" class="submit-btn btn btn-primary btn-lg ml-2">
-								{{ _(button_label, context="Button in web form") or _("Submit", context="Button in web
-								form") }}
-							</button>
-						</div>
+
+					<div class="esign-form-footer">
+						<button type="submit" class="btn btn-primary btn-lg btn-block esign-submit-btn">
+							{{ _(button_label, context="Button in web form") or _("Sign & Submit", context="Button in web form") }}
+						</button>
 					</div>
 				</form>
 
-				<!-- attachments -->
+				<!-- Attachments -->
 				{% if show_attachments and not is_new and attachments %}
-				<div class="attachments">
-					<h5 class="mb-3">{{ _("Attachments") }}</h5>
+				<div class="esign-attachments">
+					<h5>{{ _("Attachments") }}</h5>
 					{% for attachment in attachments %}
-					<a class="attachment attachment-link" href="{{ attachment.file_url }}" target="blank">
-						<div class="file-name ellipsis">
-							<svg class="icon icon-sm">
-								<use href="#icon-attachment"></use>
-							</svg>
-							<span>{{ attachment.file_name }}</span>
-						</div>
-						<div class="file-size">{{ attachment.file_size }}</div>
+					<a class="esign-attachment" href="{{ attachment.file_url }}" target="_blank">
+						<svg class="icon icon-sm"><use href="#icon-attachment"></use></svg>
+						<span class="esign-attachment-name">{{ attachment.file_name }}</span>
+						<span class="esign-attachment-size">{{ attachment.file_size }}</span>
 					</a>
 					{% endfor %}
 				</div>
 				{% endif %}
-
-				<!-- comments -->
-				{% if allow_comments and not is_new and not is_list %}
-				<div class="comments">
-					<h3>{{ _("Comments") }}</h3>
-					{% include 'templates/includes/comments/comments.html' %}
-				</div>
-				{% endif %}
-				{% endif %}
 			</div>
 
-			<!-- success page (shown immediately if already signed, or after submission) -->
-			<div class="success-page {{ '' if is_completed else 'hide' }} col-sm-12">
-				<div class="success-header">
-					<svg class="success-icon icon">
-						<use href="#icon-solid-success"></use>
-					</svg>
-					<h2 class="success-title-esign">
-						{% if is_completed %}
-							{{ _("Document Signed") }}
-						{% else %}
-							{{ _(success_title) or _("Submitted") }}
-						{% endif %}
-					</h2>
+			<!-- Post-submission success (hidden, shown via JS) -->
+			<div class="esign-success-card hide" id="esign-success-card">
+				<div class="esign-success-icon">
+					<svg class="icon icon-xl"><use href="#icon-solid-success"></use></svg>
 				</div>
-
-				<div class="success-body">
-					<p class="success-message-esign">
-						{% if is_completed %}
-							{{ _("This document has been signed.") }}
-						{% else %}
-							{{ _(success_message) or _("Thank you for spending your valuable time to fill this form") }}
-						{% endif %}
-					</p>
-				</div>
-
-				<div class="success-footer">
-					{% if success_url and not is_completed %}
-					<div class="success_url_message">
-						<p>
-							{% set success_link = '<a href="{0}">{1}</a>'.format(success_url, _("Click here")) %}
-							{{ _("{0} if you are not redirected within {1} seconds").format(success_link, '<span
-								class="time">5</span>') }}
-						</p>
-					</div>
-					{% endif %}
-				</div>
+				<h2 class="esign-success-title">{{ _(success_title) or _("Submitted") }}</h2>
+				<p class="esign-success-message">{{ _(success_message) or _("Thank you for signing this document.") }}</p>
+				{% if success_url %}
+				<p class="esign-redirect-message">
+					{% set success_link = '<a href="{0}">{1}</a>'.format(success_url, _("Click here")) %}
+					{{ _("{0} if you are not redirected within {1} seconds").format(success_link, '<span class="time">5</span>') }}
+				</p>
+				{% endif %}
 			</div>
-			<div style="height: 3rem"></div>
-		</div>
+			{% endif %}
+		</aside>
 	</div>
 </div>
 
@@ -195,12 +162,12 @@
 		})(document);
 	}
 
-	// PDF viewer-style viewport scaling
-	function scaleToFitViewport() {
-		const container = document.getElementById('print-view-container');
+	// Scale print format to fit the document pane
+	function scaleToFitDocumentPane() {
+		const documentPane = document.querySelector('.esign-document-pane');
 		const shadowHost = document.getElementById('shadow-host');
 
-		if (!shadowHost || !shadowHost.shadowRoot) {
+		if (!shadowHost || !shadowHost.shadowRoot || !documentPane) {
 			return;
 		}
 
@@ -209,18 +176,20 @@
 			return;
 		}
 
+		// Reset zoom to measure natural width
+		printFormat.style.zoom = '100%';
+
 		// Get the natural width of the print format content
 		const contentWidth = printFormat.scrollWidth;
 
-		// Get the available viewport width (minus padding/margins)
-		const viewportWidth = window.innerWidth;
-		const containerPadding = 40; // Account for margins and padding
-		const availableWidth = viewportWidth - containerPadding;
+		// Get the available width from the document pane
+		const paneWidth = documentPane.clientWidth;
+		const padding = 32; // Account for padding
+		const availableWidth = paneWidth - padding;
 
 		// Calculate scale factor
 		let scale = 100;
-		if (contentWidth > availableWidth) {
-			console.debug(`Content width (${contentWidth}px) exceeds available width (${availableWidth}px). Scaling down.`);
+		if (contentWidth > availableWidth && availableWidth > 0) {
 			scale = 100 * (availableWidth / contentWidth);
 		}
 
@@ -230,10 +199,7 @@
 
 	// Initialize scaling after content loads
 	function initializeScaling() {
-		// Wait for shadow DOM content to fully render
-		setTimeout(() => {
-			scaleToFitViewport();
-		}, 100);
+		setTimeout(scaleToFitDocumentPane, 100);
 	}
 
 	// Run on load
@@ -247,14 +213,24 @@
 	let resizeTimeout;
 	window.addEventListener('resize', () => {
 		clearTimeout(resizeTimeout);
-		resizeTimeout = setTimeout(scaleToFitViewport, 150);
+		resizeTimeout = setTimeout(scaleToFitDocumentPane, 150);
 	});
 
 	// Re-scale when fonts are loaded
 	if (document.fonts) {
 		document.fonts.ready.then(() => {
-			setTimeout(scaleToFitViewport, 100);
+			setTimeout(scaleToFitDocumentPane, 100);
 		});
 	}
+
+	// "Sign Now" button - scroll to form on mobile
+	document.querySelectorAll('.esign-scroll-to-form').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const sidebar = document.querySelector('.esign-sidebar');
+			if (sidebar) {
+				sidebar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
+		});
+	});
 </script>
 {% endblock %}
