@@ -18,19 +18,8 @@ extend_doctype_class = {
 	"Email Template": "esign.esign.overrides.email_template.EsignEmailTemplate",
 }
 
-doc_events = {
-	"*": {
-		"on_update": [
-			"esign.esign.overrides.web_form.on_update_esign_document",
-		],
-	}
-}
-
 jinja = {
 	"methods": [
 		"esign.esign.overrides.web_form.get_esign_link",
 	]
 }
-
-# web_include_js = "web_form.public.bundle.js"
-# webform_include_js = {"*": "public/js/web_form.public.bundle.js"}
