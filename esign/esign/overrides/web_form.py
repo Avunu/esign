@@ -3,6 +3,7 @@ from typing import TypedDict
 
 import frappe
 from frappe import _
+from frappe.model.docstatus import DocStatus
 from frappe.model.document import Document
 from frappe.twofactor import get_qr_svg_code
 from frappe.types import DF
@@ -167,8 +168,9 @@ def on_update_esign_document(doc, method):
 	# If configured, update a field with a specific value
 	if web_form.esign_update_field and web_form.esign_update_value is not None:
 		try:
-			if web_form.esign_update_field in doc.meta.fields_map:
-				df = doc.meta.fields_map[web_form.esign_update_field]
+			meta = frappe.get_meta(doc.doctype)
+			if meta.has_field(web_form.esign_update_field):
+				df = meta.get_field(web_form.esign_update_field)
 				if df and df.fieldtype in ("Select", "Link", "Data", "Text"):
 					doc.set(web_form.esign_update_field, web_form.esign_update_value)
 					doc.save(ignore_permissions=True)
@@ -181,7 +183,9 @@ def on_update_esign_document(doc, method):
 	# If configured, submit the document if it is in draft state
 	if web_form.esign_submit_on_response and doc.docstatus == 0 and doc.meta.is_submittable:
 		try:
-			doc.submit()
+			# submit manually as doc.submit() doesn't allow ignore_permissions
+			doc.docstatus = DocStatus(1)
+			return doc.save(ignore_permissions=True)
 		except Exception as e:
 			frappe.log_error(
 				title=f"eSign: Failed to submit {doc.doctype} {doc.name}",
