@@ -8,7 +8,9 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		super.make();
 
 		if (this.df.label) {
-			$(this.wrapper).find("label").text(__(this.df.label, null, this.df.parent));
+			$(this.wrapper)
+				.find("label")
+				.text(__(this.df.label, null, this.df.parent));
 		}
 
 		me.body = document.createElement("div");
@@ -122,7 +124,8 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		this.make_pad();
 
 		// Hide the default input wrapper
-		const controlInput = this.$wrapper?.[0]?.querySelector?.(".control-input");
+		const controlInput =
+			this.$wrapper?.[0]?.querySelector?.(".control-input");
 		if (controlInput) {
 			controlInput.style.display = "none";
 		}

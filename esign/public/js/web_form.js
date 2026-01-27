@@ -13,10 +13,17 @@ frappe.ui.form.on("Web Form", {
 		frappe.model.with_doctype(doc.doc_type, () => {
 			const fieldnames = frappe
 				.get_meta(doc.doc_type)
-				.fields.filter((field) => !frappe.model.no_value_type.includes(field.fieldtype))
+				.fields.filter(
+					(field) =>
+						!frappe.model.no_value_type.includes(field.fieldtype),
+				)
 				.map((field) => field.fieldname);
 
-			frm.set_df_property("esign_update_field", "options", [""].concat(fieldnames));
+			frm.set_df_property(
+				"esign_update_field",
+				"options",
+				[""].concat(fieldnames),
+			);
 		});
 	},
 });

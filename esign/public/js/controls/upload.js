@@ -6,7 +6,8 @@ export class ControlUpload extends frappe.ui.form.ControlData {
 		this.file_input = document.createElement("input");
 		this.file_input.type = "file";
 		this.file_input.className = "hidden";
-		this.file_input.accept = this.df.options?.allowed_file_types?.join(",") || "image/*";
+		this.file_input.accept =
+			this.df.options?.allowed_file_types?.join(",") || "image/*";
 		this.file_input.addEventListener("change", (e) => {
 			this.handle_file_selection(e);
 		});

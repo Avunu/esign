@@ -14,13 +14,15 @@ async function initializeESignControls() {
 
 	// Now we can safely import and register the controls
 	try {
-		const [signaturePadModule, uploadModule, signatureModule] = await Promise.all([
-			import("./controls/signature_pad"),
-			import("./controls/upload"),
-			import("./controls/signature"),
-		]);
+		const [signaturePadModule, uploadModule, signatureModule] =
+			await Promise.all([
+				import("./controls/signature_pad"),
+				import("./controls/upload"),
+				import("./controls/signature"),
+			]);
 
-		frappe.ui.form.ControlSignaturePad = signaturePadModule.ControlSignaturePad;
+		frappe.ui.form.ControlSignaturePad =
+			signaturePadModule.ControlSignaturePad;
 		frappe.ui.form.ControlUpload = uploadModule.ControlUpload;
 		frappe.ui.form.ControlSignature = signatureModule.ControlSignature;
 	} catch (error) {

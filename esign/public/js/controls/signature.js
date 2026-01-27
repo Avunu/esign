@@ -22,12 +22,14 @@ class MockForm {
 		const activeTabId = `signature-dialog-${active_tab?.df?.fieldname}`;
 
 		// Get tab content elements
-		const previousTabContent = this.active_tab?.tabs_content?.[0]?.querySelector(
-			`#${previousTabId}`
-		);
-		const activeTabContent = this.active_tab?.tabs_content?.[0]?.querySelector(
-			`#${activeTabId}`
-		);
+		const previousTabContent =
+			this.active_tab?.tabs_content?.[0]?.querySelector(
+				`#${previousTabId}`,
+			);
+		const activeTabContent =
+			this.active_tab?.tabs_content?.[0]?.querySelector(
+				`#${activeTabId}`,
+			);
 
 		// Set new active tab
 		this.active_tab = active_tab;
@@ -47,7 +49,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 
 		// Store reference to label element (created by parent)
 		if (this.df.label && this.label_area) {
-			this.label_area.textContent = __(this.df.label, null, this.df.parent);
+			this.label_area.textContent = __(
+				this.df.label,
+				null,
+				this.df.parent,
+			);
 		}
 
 		// make a pointer to value
@@ -142,15 +148,18 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			size: "large",
 			primary_action_label: __("Insert Signature"),
 			primary_action: function () {
-				const current_tab = signature_dialog.frm.active_tab?.df.fieldname || null;
+				const current_tab =
+					signature_dialog.frm.active_tab?.df.fieldname || null;
 
 				if (current_tab === "tab_draw") {
-					const signature_field = signature_dialog.fields_dict.signature_draw;
+					const signature_field =
+						signature_dialog.fields_dict.signature_draw;
 					let signature_data;
 
 					if (signature_field && signature_field.signature_pad) {
 						if (!signature_field.signature_pad.isEmpty()) {
-							signature_data = signature_field.canvas.toDataURL("image/png");
+							signature_data =
+								signature_field.canvas.toDataURL("image/png");
 						}
 					}
 
@@ -161,27 +170,35 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 						frappe.msgprint(__("Please draw a signature first"));
 					}
 				} else if (current_tab === "tab_type") {
-					let typed_signature = signature_dialog.get_value("signature_typed");
+					let typed_signature =
+						signature_dialog.get_value("signature_typed");
 					if (typed_signature) {
-						me.convert_typed_to_base64(typed_signature).then((base64) => {
-							me.set_signature_value(base64, "typed");
-							signature_dialog.hide();
-						});
+						me.convert_typed_to_base64(typed_signature).then(
+							(base64) => {
+								me.set_signature_value(base64, "typed");
+								signature_dialog.hide();
+							},
+						);
 					} else {
 						frappe.msgprint(__("Please enter a signature text"));
 					}
 				} else if (current_tab === "tab_upload") {
-					let uploaded_signature = signature_dialog.get_value("signature_upload");
+					let uploaded_signature =
+						signature_dialog.get_value("signature_upload");
 					if (uploaded_signature) {
-						me.map_upload_to_canvas(uploaded_signature).then((base64) => {
-							me.set_signature_value(base64, "upload");
-							signature_dialog.hide();
-						});
+						me.map_upload_to_canvas(uploaded_signature).then(
+							(base64) => {
+								me.set_signature_value(base64, "upload");
+								signature_dialog.hide();
+							},
+						);
 					} else {
 						frappe.msgprint(__("Please upload a signature image"));
 					}
 				} else {
-					frappe.msgprint(__("Please select a method to add your signature"));
+					frappe.msgprint(
+						__("Please select a method to add your signature"),
+					);
 				}
 			},
 		});
@@ -322,13 +339,24 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		const ctx = this.display_canvas.getContext("2d");
 
 		// Clear canvas
-		ctx.clearRect(0, 0, this.display_canvas.width, this.display_canvas.height);
+		ctx.clearRect(
+			0,
+			0,
+			this.display_canvas.width,
+			this.display_canvas.height,
+		);
 
 		if (value) {
 			// Load and draw signature
 			const img = new Image();
 			img.onload = () => {
-				ctx.drawImage(img, 0, 0, this.display_canvas.width, this.display_canvas.height);
+				ctx.drawImage(
+					img,
+					0,
+					0,
+					this.display_canvas.width,
+					this.display_canvas.height,
+				);
 			};
 			img.src = value;
 		} else {
@@ -340,7 +368,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				10,
 				10,
 				this.display_canvas.width - 20,
-				this.display_canvas.height - 20
+				this.display_canvas.height - 20,
 			);
 			ctx.setLineDash([]);
 		}
