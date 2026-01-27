@@ -18,6 +18,11 @@ extend_doctype_class = {
 	"Email Template": "esign.esign.overrides.email_template.EsignEmailTemplate",
 }
 
+# Override the web form accept function for eSign forms
+override_whitelisted_methods = {
+	"frappe.website.doctype.web_form.web_form.accept": "esign.esign.overrides.web_form.accept",
+}
+
 doc_events = {
 	"*": {
 		"on_update": [
@@ -31,3 +36,5 @@ jinja = {
 		"esign.esign.overrides.web_form.get_esign_link",
 	]
 }
+
+web_include_js = "web_form.public.bundle.js"
