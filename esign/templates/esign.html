@@ -7,6 +7,7 @@
 	frappe._messages = {{ translated_messages }};
 	frappe.web_form_doc = {{ web_form_doc | json }};
 	frappe.reference_doc = {{ reference_doc | json }};
+	frappe.is_completed = {{ is_completed | tojson }};
 </script>
 {% endblock %}
 
@@ -69,7 +70,7 @@
 </div>
 
 <!-- Mobile requirement message and QR code (shown on desktop when force_mobile is true) -->
-{% if force_mobile %}
+{% if force_mobile and not is_completed %}
 <div class="mobile-required-message d-md-block d-none">
 	<div class="alert alert-info text-center p-4">
 		<h4 class="mb-3">{{ _("📱 Touch Screen Required") }}</h4>
@@ -90,6 +91,7 @@
 		<div class="container container-fluid doc-container">
 			<div class="web-form-container">
 
+				{% if not is_completed %}
 				<h4 class="mb-3 col-sm-12">{{ _("Fill and Sign") }}</h4>
 
 				<!-- web form -->
@@ -134,26 +136,36 @@
 					{% include 'templates/includes/comments/comments.html' %}
 				</div>
 				{% endif %}
+				{% endif %}
 			</div>
 
-			<!-- success page -->
-			<div class="success-page hide col-sm-12">
+			<!-- success page (shown immediately if already signed, or after submission) -->
+			<div class="success-page {{ '' if is_completed else 'hide' }} col-sm-12">
 				<div class="success-header">
 					<svg class="success-icon icon">
 						<use href="#icon-solid-success"></use>
 					</svg>
-					<h2 class="success-title-esign">{{ _(success_title) or _("Submitted") }}</h2>
+					<h2 class="success-title-esign">
+						{% if is_completed %}
+							{{ _("Document Signed") }}
+						{% else %}
+							{{ _(success_title) or _("Submitted") }}
+						{% endif %}
+					</h2>
 				</div>
 
 				<div class="success-body">
-					<p class="success-message-esign">{{ _(success_message) or _("Thank you for spending your valuable
-						time to
-						fill
-						this form") }}</p>
+					<p class="success-message-esign">
+						{% if is_completed %}
+							{{ _("This document has been signed.") }}
+						{% else %}
+							{{ _(success_message) or _("Thank you for spending your valuable time to fill this form") }}
+						{% endif %}
+					</p>
 				</div>
 
 				<div class="success-footer">
-					{% if success_url %}
+					{% if success_url and not is_completed %}
 					<div class="success_url_message">
 						<p>
 							{% set success_link = '<a href="{0}">{1}</a>'.format(success_url, _("Click here")) %}

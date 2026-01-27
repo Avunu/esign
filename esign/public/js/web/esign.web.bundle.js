@@ -1,6 +1,6 @@
 /**
  * eSign Web Form Bundle
- * 
+ *
  * Complete replacement for frappe's web_form.bundle.js that includes
  * our extended WebForm class with custom accept endpoint for eSign forms.
  */

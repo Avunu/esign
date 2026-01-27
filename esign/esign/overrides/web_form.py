@@ -125,7 +125,34 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		if self.esign_force_mobile:
 			context.force_mobile = True
 			context.qrcode_svg = get_qr_svg_code(frappe.request.url).decode()
+
+		# Check if document has already been signed (all signature fields have values)
+		context.is_completed = self._check_signature_exists(doc)
+
 		return context
+
+	def _check_signature_exists(self, doc: Document) -> bool:
+		"""Check if all signature fields in the web form already have values."""
+		signature_fields = [
+			field.fieldname for field in self.web_form_fields if field.fieldtype == "Signature"
+		]
+
+		# If no signature fields, not applicable
+		if not signature_fields:
+			return False
+
+		# Check if ALL signature fields have non-empty values
+		for fieldname in signature_fields:
+			value = doc.get(fieldname)
+			# debug
+			frappe.log_error(
+				title="eSign: Checking signature field",
+				message=f"Field: {fieldname}, Value: {value}",
+			)
+			if not value or str(value) == "/assets/frappe/images/signature-placeholder.png":
+				return False
+
+		return True
 
 	def validate(self):
 		super().validate()
