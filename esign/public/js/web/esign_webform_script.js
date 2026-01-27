@@ -1,6 +1,6 @@
 /**
  * eSign WebForm Script
- * 
+ *
  * This replaces frappe's webform_script.js for eSign-enabled forms.
  * It extends WebForm to use our custom accept endpoint and registers
  * our custom controls for the web/public frontend.
@@ -24,12 +24,15 @@ class EsignWebForm extends WebForm {
 			? "esign.esign.overrides.web_form.accept"
 			: "frappe.website.doctype.web_form.web_form.accept";
 
+		// debug
+		console.debug("Using save method:", method);
+
 		let is_new = this.is_new;
 		let valid = this.validate && this.validate();
 		if (!valid && valid !== undefined) {
 			frappe.msgprint(
 				__("Couldn't save, please check the data you have entered"),
-				__("Validation Error")
+				__("Validation Error"),
 			);
 			return false;
 		}
@@ -70,12 +73,17 @@ class EsignWebForm extends WebForm {
 					frappe.web_form.events.trigger("after_save");
 					this.after_save && this.after_save();
 					// args doctype and docname added to link doctype in file manager
-					if (is_new && (response.message.attachment || response.message.file)) {
+					if (
+						is_new &&
+						(response.message.attachment || response.message.file)
+					) {
 						frappe.call({
 							type: "POST",
 							method: "frappe.handler.upload_file",
 							args: {
-								file_url: response.message.attachment || response.message.file,
+								file_url:
+									response.message.attachment ||
+									response.message.file,
 								doctype: response.message.doctype,
 								docname: response.message.name,
 							},
@@ -100,16 +108,21 @@ frappe.ready(function () {
 	web_form_doc.is_list ? show_list() : show_form();
 
 	function show_login_prompt() {
-		if (frappe.session.user != "Guest" || !web_form_doc.login_required) return;
+		if (frappe.session.user != "Guest" || !web_form_doc.login_required)
+			return;
 		const login_required = new frappe.ui.Dialog({
 			title: __("Not Permitted"),
 			primary_action_label: __("Login"),
 			primary_action: () => {
-				window.location.replace("/login?redirect-to=" + window.location.pathname);
+				window.location.replace(
+					"/login?redirect-to=" + window.location.pathname,
+				);
 			},
 		});
 		login_required.show();
-		login_required.set_message(__("You are not permitted to access this page without login."));
+		login_required.set_message(
+			__("You are not permitted to access this page without login."),
+		);
 	}
 
 	function show_list() {
@@ -147,7 +160,9 @@ frappe.ready(function () {
 	function setup_fields(web_form_doc, doc_data) {
 		web_form_doc.web_form_fields.forEach((df) => {
 			df.is_web_form = true;
-			df.read_only = df.read_only || (!web_form_doc.is_new && !web_form_doc.in_edit_mode);
+			df.read_only =
+				df.read_only ||
+				(!web_form_doc.is_new && !web_form_doc.in_edit_mode);
 			if (df.fieldtype === "Table") {
 				df.get_data = () => {
 					let data = [];
