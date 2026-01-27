@@ -1,19 +1,21 @@
 $(document).on("form-refresh", function (event, frm) {
-	frappe.call("esign.esign.can_esign", {
-		doctype: frm.doctype,
-		doc: frm.doc,
-	}).then((r) => {
-		if (r.message) {
-			const esign_dialog = new ESignDialog(frm);
-			frm.add_custom_button(__("Send for eSign"), () => {
-				if (frm.doc.__islocal) {
-					frappe.msgprint(__("Please save the document before sending for eSign."));
-					return;
-				}
-				esign_dialog.show();
-			});
-		}
-	});
+	frappe
+		.call("esign.esign.can_esign", {
+			doctype: frm.doctype,
+			doc: frm.doc,
+		})
+		.then((r) => {
+			if (r.message) {
+				const esign_dialog = new ESignDialog(frm);
+				frm.add_custom_button(__("Send for eSign"), () => {
+					if (frm.doc.__islocal) {
+						frappe.msgprint(__("Please save the document before sending for eSign."));
+						return;
+					}
+					esign_dialog.show();
+				});
+			}
+		});
 });
 
 class ESignDialog {

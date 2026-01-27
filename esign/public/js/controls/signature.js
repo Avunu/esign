@@ -296,7 +296,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		// Update overlay text and interaction
 		if (can_write) {
 			this.canvas_container.classList.remove("readonly");
-			
+
 			if (value) {
 				this.overlay_text.innerHTML = `
 					${frappe.utils.icon("edit", "md")}
@@ -336,7 +336,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			ctx.setLineDash([5, 5]);
 			ctx.strokeStyle = "var(--border-color)";
 			ctx.lineWidth = 2;
-			ctx.strokeRect(10, 10, this.display_canvas.width - 20, this.display_canvas.height - 20);
+			ctx.strokeRect(
+				10,
+				10,
+				this.display_canvas.width - 20,
+				this.display_canvas.height - 20
+			);
 			ctx.setLineDash([]);
 		}
 	}
