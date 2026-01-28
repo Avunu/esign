@@ -47,17 +47,17 @@ repos:
 
 
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v10.0.0-rc.1
+    rev: v10.0.0-rc.2
     hooks:
       - id: eslint
         types_or: [javascript]
         args: ['--quiet']
         additional_dependencies: 
-          - eslint@^9.39.2
-          - jiti@^2.6.1
-          - globals@^17.1.0
-          - typescript@^5.9.3
-          - typescript-eslint@^8.53.1
+          - eslint
+          - jiti
+          - globals
+          - typescript
+          - typescript-eslint
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
