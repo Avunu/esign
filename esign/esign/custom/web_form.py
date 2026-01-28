@@ -104,7 +104,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		key = frappe.form_dict.get("key", "")
 
 		# Get document without permission check - we'll validate via share key
-		doc = frappe.get_doc(self.doc_type, cur_doc_name, check_permission=False)
+		doc = frappe.get_doc(self.doc_type, cur_doc_name)
 		doc.flags.ignore_permissions = True
 
 		# Validate access via share key or fallback to standard permissions
@@ -264,7 +264,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 			key = frappe.form_dict.get("key")
 			if key:
 				try:
-					doc = frappe.get_doc(doctype, name, check_permission=False)
+					doc = frappe.get_doc(doctype, name)
 					doc.flags.ignore_permissions = True
 					validate_esign_key(key, doc, require_key=True)
 					return True
@@ -463,7 +463,7 @@ def get_print_html(
 		frappe.form_dict.key = key
 
 	# Get the document without permission checks - we'll validate via share key
-	doc = frappe.get_doc(doctype, docname, check_permission=False)
+	doc = frappe.get_doc(doctype, docname)
 	doc.flags.ignore_permissions = True
 
 	# Skip internal permission checks since we're using key-based auth
@@ -524,7 +524,7 @@ def download_signed_pdf(doctype: str, docname: str, key: str = ""):
 	from frappe.utils.response import send_private_file
 
 	# Get the document without permission checks - we'll validate via share key
-	doc = frappe.get_doc(doctype, docname, check_permission=False)
+	doc = frappe.get_doc(doctype, docname)
 	doc.flags.ignore_permissions = True
 
 	# Validate access via share key - require key for guest access
