@@ -114,8 +114,10 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		context.doctype = self.doc_type
 		context.name = cur_doc_name
 		context.print_format = print_format
-		form_fields = [field.fieldname for field in self.web_form_fields]
-		context.reference_doc = doc.as_dict()
+		form_fields: set[str] = {field.fieldname for field in self.web_form_fields if field.fieldname}
+		form_fields.add("name")
+		form_fields.add("doctype")
+		context.reference_doc = {k: v for k, v in doc.as_dict().items() if k in form_fields}
 
 		# Add print view content and styles to context
 		context.print_html = print_html
@@ -208,20 +210,19 @@ def attach_print_to_document(
 	"""
 	from frappe import attach_print
 
-	frappe.local.request = frappe._dict(
+	mock_request = frappe._dict(
 		{
 			"headers": request_data.get("headers", {}),
 			"host_url": request_data["host_url"],
 			"host": request_data.get("host"),
 			"method": request_data.get("method", "GET"),
-			"no_cache": True,
+			"cache_control": frappe._dict({"no_cache": True}),
 			"scheme": request_data.get("scheme", "https"),
 		}
 	)
 
-	# disable cache for print generation
-	if frappe.request:
-		frappe.request.cache_control = frappe._dict({"no_cache": True})
+	frappe.request = mock_request
+	frappe.local.request = mock_request
 
 	# Generate the PDF
 	timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")

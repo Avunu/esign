@@ -116,8 +116,8 @@ def send_esign_email(
 			<h4 style="margin: 0 0 10px 0; color: #007bff;">{_("eSign Required")}</h4>
 			<p style="margin: 0 0 10px 0;">{_("Please click the link below to review and sign the document:")}</p>
 			<a href="{esign_link}"
-			   style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;"
-			   target="_blank">
+				style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;"
+				target="_blank">
 				{_("Sign Document")}
 			</a>
 		</div>
