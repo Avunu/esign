@@ -8,6 +8,180 @@
 import WebFormList from "../../../../../frappe/frappe/public/js/frappe/web_form/web_form_list";
 import WebForm from "../../../../../frappe/frappe/public/js/frappe/web_form/web_form";
 
+// ============================================================================
+// Document Preview Functions
+// ============================================================================
+
+/**
+ * Scale print format to fit the document pane width
+ */
+function scaleToFitDocumentPane() {
+	const documentPane = document.querySelector(".esign-document-pane");
+	const shadowHost = document.getElementById("shadow-host");
+
+	if (!shadowHost || !shadowHost.shadowRoot || !documentPane) {
+		return;
+	}
+
+	const printFormat = shadowHost.shadowRoot.querySelector(".print-format");
+	if (!printFormat) {
+		return;
+	}
+
+	// Reset zoom to measure natural width
+	printFormat.style.zoom = "100%";
+
+	// Get the natural width of the print format content
+	const contentWidth = printFormat.scrollWidth;
+
+	// Get the available width from the document pane
+	const paneWidth = documentPane.clientWidth;
+	const padding = 32; // Account for padding
+	const availableWidth = paneWidth - padding;
+
+	// Calculate scale factor
+	let scale = 100;
+	if (contentWidth > availableWidth && availableWidth > 0) {
+		scale = 100 * (availableWidth / contentWidth);
+	}
+
+	// Apply the scale transformation
+	printFormat.style.zoom = `${scale}%`;
+}
+
+/**
+ * Load print HTML asynchronously from the server
+ * @returns {Promise} Promise that resolves when content is loaded and rendered
+ */
+function loadPrintHtml() {
+	const ctx = frappe.esign_context;
+	if (!ctx || !ctx.doctype || !ctx.name) {
+		console.error("eSign context not available");
+		return Promise.reject("Context not available");
+	}
+
+	const shadowHost = document.getElementById("shadow-host");
+	if (!shadowHost || !shadowHost.shadowRoot) {
+		console.error("Shadow host not available");
+		return Promise.reject("Shadow host not available");
+	}
+
+	const shadowRoot = shadowHost.shadowRoot;
+	const loadingEl = shadowRoot.getElementById("print-view-loading");
+	const printContent = shadowRoot.getElementById("print-content");
+
+	// Show loading state
+	if (loadingEl) loadingEl.classList.remove("hide");
+	if (printContent) printContent.classList.add("hide");
+
+	return frappe
+		.call({
+			method: "esign.esign.overrides.web_form.get_print_html",
+			args: {
+				doctype: ctx.doctype,
+				docname: ctx.name,
+				print_format: ctx.print_format || "standard",
+				key: ctx.key || "",
+			},
+			freeze: false,
+		})
+		.then((response) => {
+			if (response.message) {
+				renderPrintHtml(
+					response.message.print_html,
+					response.message.print_style,
+				);
+			}
+		})
+		.catch((error) => {
+			console.error("Failed to load print HTML:", error);
+			if (loadingEl) {
+				loadingEl.innerHTML =
+					'<p class="text-danger">Failed to load document preview.</p>';
+			}
+		});
+}
+
+/**
+ * Render print HTML into the shadow DOM
+ * @param {string} printHtml - The HTML content to render
+ * @param {string} printStyle - Additional CSS styles for the print format
+ */
+function renderPrintHtml(printHtml, printStyle) {
+	const shadowHost = document.getElementById("shadow-host");
+	if (!shadowHost || !shadowHost.shadowRoot) return;
+
+	const shadowRoot = shadowHost.shadowRoot;
+	const loadingEl = shadowRoot.getElementById("print-view-loading");
+	const printContent = shadowRoot.getElementById("print-content");
+	const styleEl = shadowRoot.getElementById("print-style");
+
+	// Append print format styles to existing style element
+	if (styleEl && printStyle) {
+		styleEl.textContent += printStyle;
+	}
+
+	// Set the print content
+	if (printContent) {
+		printContent.innerHTML = `<div class="print-format">${printHtml}</div>`;
+		printContent.classList.remove("hide");
+	}
+
+	// Hide loading
+	if (loadingEl) loadingEl.classList.add("hide");
+
+	// Scale after content is rendered
+	setTimeout(scaleToFitDocumentPane, 100);
+
+	// Re-scale when fonts are loaded
+	if (document.fonts) {
+		document.fonts.ready.then(() => {
+			setTimeout(scaleToFitDocumentPane, 100);
+		});
+	}
+}
+
+/**
+ * Refresh the document preview (called after form submission)
+ * @returns {Promise} Promise that resolves when content is refreshed
+ */
+function refreshPrintHtml() {
+	return loadPrintHtml();
+}
+
+// Expose functions globally for external access
+window.loadPrintHtml = loadPrintHtml;
+window.refreshPrintHtml = refreshPrintHtml;
+
+/**
+ * Initialize document preview functionality
+ */
+function initDocumentPreview() {
+	// Load print HTML
+	loadPrintHtml();
+
+	// Re-scale on window resize with debouncing
+	let resizeTimeout;
+	window.addEventListener("resize", () => {
+		clearTimeout(resizeTimeout);
+		resizeTimeout = setTimeout(scaleToFitDocumentPane, 150);
+	});
+
+	// "Sign Now" button - scroll to form on mobile
+	document.querySelectorAll(".esign-scroll-to-form").forEach((btn) => {
+		btn.addEventListener("click", () => {
+			const sidebar = document.querySelector(".esign-sidebar");
+			if (sidebar) {
+				sidebar.scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+		});
+	});
+}
+
+// ============================================================================
+// Custom Controls Registration
+// ============================================================================
+
 // Import and register eSign controls for web forms
 import { ControlSignaturePad } from "../controls/signature_pad";
 import { ControlUpload } from "../controls/upload";
@@ -22,6 +196,13 @@ class EsignWebForm extends WebForm {
 		// Override to use eSign success card in sidebar
 		const formCard = document.querySelector(".esign-form-card");
 		const successCard = document.getElementById("esign-success-card");
+
+		// Refresh the document preview to show the new signature
+		if (window.refreshPrintHtml) {
+			window.refreshPrintHtml().then(() => {
+				console.debug("Document preview refreshed after signing");
+			});
+		}
 
 		if (formCard && successCard) {
 			// Hide the form card, show the success card
@@ -143,6 +324,11 @@ class EsignWebForm extends WebForm {
 frappe.ready(function () {
 	let web_form_doc = frappe.web_form_doc;
 	let reference_doc = frappe.reference_doc;
+
+	// Initialize document preview (always, even for completed forms)
+	if (frappe.esign_context) {
+		initDocumentPreview();
+	}
 
 	// If document is already completed/signed, don't initialize the form
 	if (frappe.is_completed) {

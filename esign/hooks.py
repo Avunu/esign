@@ -15,21 +15,21 @@ after_uninstall = "esign.esign.config.after_uninstall"
 
 # Timeline integration for eSign audit trail
 additional_timeline_content = {
-    "*": ["esign.esign.hooks.get_timeline_content"],
+	"*": ["esign.esign.hooks.get_timeline_content"],
 }
 
 
 doctype_js = {
-    "Web Form": "public/js/web_form.js",
+	"Web Form": "public/js/web_form.js",
 }
 
 extend_doctype_class = {
-    "Web Form": "esign.esign.overrides.web_form.EsignWebForm",
-    "Email Template": "esign.esign.overrides.email_template.EsignEmailTemplate",
+	"Web Form": "esign.esign.overrides.web_form.EsignWebForm",
+	"Email Template": "esign.esign.overrides.email_template.EsignEmailTemplate",
 }
 
 jinja = {
-    "methods": [
-        "esign.esign.overrides.web_form.get_esign_link",
-    ]
+	"methods": [
+		"esign.esign.overrides.web_form.get_esign_link",
+	]
 }

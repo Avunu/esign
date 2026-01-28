@@ -16,6 +16,14 @@ from frappe.types import DF
 from frappe.website.doctype.web_form.web_form import WebForm as BaseWebForm
 from frappe.www.printview import validate_print_permission
 
+
+class PrintHtmlResponse(TypedDict):
+	"""Response from get_print_html endpoint."""
+
+	print_html: str
+	print_style: str
+
+
 # Import PaymentWebForm if available, otherwise create a dummy class
 try:
 	from payments.overrides.payment_webform import PaymentWebForm  # type: ignore
@@ -61,40 +69,12 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		if not self.esign_enabled or not cur_doc_name or frappe.form_dict.is_list:
 			super().get_context(context)
 			return context
-		doc = frappe.get_doc(self.doc_type, cur_doc_name)
+		doc = frappe.get_doc(self.doc_type, cur_doc_name, check_permission=False)
+		doc.flags.ignore_permissions = True
 		# validate either the user permissions or the access key
 		validate_print_permission(doc)
 		# Allow public access to the web form if validation passes
 		print_format = frappe.form_dict.get("format", self.print_format) or "standard"
-
-		# Get print format document
-		from frappe.www.printview import (
-			get_print_format_doc,
-			get_print_style,
-			get_rendered_template,
-			set_link_titles,
-		)
-
-		meta = frappe.get_meta(self.doc_type)
-		print_format_doc = get_print_format_doc(print_format, meta=meta)
-		set_link_titles(doc)
-
-		# Get rendered print HTML
-		print_html = get_rendered_template(
-			doc=doc,
-			print_format=print_format_doc,  # type: ignore
-			meta=meta,
-			trigger_print=False,
-			no_letterhead=bool(frappe.form_dict.get("no_letterhead")),
-			letterhead=frappe.form_dict.get("letterhead"),
-			settings=None,
-		)
-
-		# Get print styles
-		print_style = get_print_style(
-			style=frappe.form_dict.get("style"),
-			print_format=print_format_doc,  # type: ignore
-		)
 
 		web_form_doc: dict = self.as_dict(no_nulls=True)
 		web_form_doc.update(
@@ -114,20 +94,13 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		context.doctype = self.doc_type
 		context.name = cur_doc_name
 		context.print_format = print_format
-		form_fields: set[str] = {
-			field.fieldname for field in self.web_form_fields if field.fieldname
-		}
+		form_fields: set[str] = {field.fieldname for field in self.web_form_fields if field.fieldname}
 		form_fields.add("name")
 		form_fields.add("doctype")
-		context.reference_doc = {
-			k: v for k, v in doc.as_dict().items() if k in form_fields
-		}
-
-		# Add print view content and styles to context
-		context.print_html = print_html
-		context.print_style = print_style
+		context.reference_doc = {k: v for k, v in doc.as_dict().items() if k in form_fields}
 
 		key = frappe.form_dict.get("key", "")
+		context.key = key  # Pass key to frontend for async API calls
 		context.printview_url = (
 			"/api/method/frappe.utils.print_format.download_pdf?"
 			f"doctype={self.doc_type}&name={cur_doc_name}&format={print_format}&key={key}"
@@ -157,9 +130,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 	def _check_signature_exists(self, doc: Document) -> bool:
 		"""Check if all signature fields in the web form already have values."""
 		signature_fields = [
-			field.fieldname
-			for field in self.web_form_fields
-			if field.fieldtype == "Signature"
+			field.fieldname for field in self.web_form_fields if field.fieldtype == "Signature"
 		]
 
 		# If no signature fields, not applicable
@@ -169,10 +140,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		# Check if ALL signature fields have non-empty values
 		for fieldname in signature_fields:
 			value = doc.get(fieldname)
-			if (
-				not value
-				or str(value) == "/assets/frappe/images/signature-placeholder.png"
-			):
+			if not value or str(value) == "/assets/frappe/images/signature-placeholder.png":
 				return False
 
 		return True
@@ -195,7 +163,8 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 			# If we have a key, validate it
 			if frappe.form_dict.get("key"):
 				try:
-					doc = frappe.get_doc(doctype, name)
+					doc = frappe.get_doc(doctype, name, check_permission=False)
+					doc.flags.ignore_permissions = True
 					validate_print_permission(doc)
 					return True
 				except (frappe.PermissionError, frappe.exceptions.LinkExpired):
@@ -319,16 +288,12 @@ def extract_param_from_referrer(param: str = "") -> str:
 		return query_params.get(param, [""])[0]
 
 	except Exception as e:
-		frappe.log_error(
-			title=f"eSign: Failed to parse referrer URL: {referrer}", message=e
-		)
+		frappe.log_error(title=f"eSign: Failed to parse referrer URL: {referrer}", message=e)
 		return ""
 
 
 @frappe.whitelist()
-def get_esign_link(
-	doc: "Document", web_form_name: str, print_format_name: str = ""
-) -> str:
+def get_esign_link(doc: "Document", web_form_name: str, print_format_name: str = "") -> str:
 	"""Get the eSign Web Form link for a given document and web form name."""
 	if isinstance(doc, str):
 		try:
@@ -365,6 +330,81 @@ def get_esign_link(
 			message=e,
 		)
 		return ""
+
+
+@frappe.whitelist(allow_guest=True)
+@rate_limit(key="web_form", limit=30, seconds=60)
+def get_print_html(
+	doctype: str, docname: str, print_format: str = "standard", key: str = ""
+) -> PrintHtmlResponse:
+	"""Get the print HTML and styles for a document.
+
+	This endpoint allows async loading of the document preview in eSign forms.
+	It validates permissions using the document share key from the referrer.
+
+	Args:
+		doctype: The DocType of the document
+		docname: The name of the document
+		print_format: The print format to use (default: "standard")
+
+	Returns:
+		PrintHtmlResponse with print_html and print_style
+	"""
+	from frappe.www.printview import (
+		get_print_format_doc,
+		get_print_style,
+		get_rendered_template,
+		set_link_titles,
+	)
+
+	# set the key, if provided
+	if key:
+		frappe.form_dict.key = key
+
+	# Get the document without permission checks - we'll validate via share key
+	doc = frappe.get_doc(doctype, docname, check_permission=False)
+	doc.flags.ignore_permissions = True
+
+	# Skip internal permission checks since we're using key-based auth
+	# This prevents msgprint warnings from has_permission checks
+	frappe.flags.ignore_print_permissions = True
+
+	# Validate the share key directly (avoids permission warning messages)
+	if key:
+		from frappe.www.printview import validate_key
+
+		if validate_key(key, doc) is False:
+			frappe.throw(_("Invalid or expired document access key"), frappe.PermissionError)
+	else:
+		# No key provided - fall back to standard permission check
+		validate_print_permission(doc)
+
+	# Get print format document
+	meta = frappe.get_meta(doctype)
+	print_format_doc = get_print_format_doc(print_format, meta=meta)
+	set_link_titles(doc)
+
+	# Get rendered print HTML
+	print_html = get_rendered_template(
+		doc=doc,
+		print_format=print_format_doc,  # type: ignore
+		meta=meta,
+		trigger_print=False,
+		no_letterhead=bool(frappe.form_dict.get("no_letterhead")),
+		letterhead=frappe.form_dict.get("letterhead"),
+		settings=None,
+	)
+
+	# Get print styles
+	print_style = get_print_style(
+		style=frappe.form_dict.get("style"),
+		print_format=print_format_doc,  # type: ignore
+	)
+
+	return PrintHtmlResponse(
+		print_html=print_html,
+		print_style=print_style,
+	)
 
 
 @frappe.whitelist()
@@ -470,9 +510,7 @@ def accept(web_form, data):
 			)
 
 	# Set docstatus for submission if configured (before save)
-	should_submit = (
-		wf.esign_submit_on_response and doc.docstatus == 0 and doc.meta.is_submittable
-	)
+	should_submit = wf.esign_submit_on_response and doc.docstatus == 0 and doc.meta.is_submittable
 	if should_submit:
 		doc.flags.ignore_permissions = True
 		doc.docstatus = DocStatus(1)
@@ -492,9 +530,7 @@ def accept(web_form, data):
 
 			# remove earlier attached file (if exists)
 			if doc.get(fieldname):
-				remove_file_by_url(
-					str(doc.get(fieldname)), doctype=doctype, name=doc.name
-				)
+				remove_file_by_url(str(doc.get(fieldname)), doctype=doctype, name=doc.name)
 
 			# save new file
 			filename, dataurl = filedata.split(",", 1)
@@ -580,9 +616,7 @@ def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 	)
 
 
-def _collect_audit_data(
-	doc: Document, wf: "EsignWebForm", print_format: str
-) -> AuditData:
+def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) -> AuditData:
 	"""Collect audit trail data at the moment of signing."""
 	# Get IP address from various possible headers (proxy-aware)
 	ip_address = _get_client_ip()
