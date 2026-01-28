@@ -161,7 +161,69 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		# Check if document has already been signed (all signature fields have values)
 		context.is_completed = self._check_signature_exists(doc)
 
+		# If completed, get the signed PDF URL instead of rendering print preview
+		if context.is_completed:
+			signed_pdf = self._get_signed_pdf(doc)
+			if signed_pdf:
+				# Build the download URL through our key-validated endpoint
+				from urllib.parse import urlencode
+
+				params = urlencode({"doctype": self.doc_type, "docname": cur_doc_name, "key": key})
+				context.signed_pdf_url = f"/api/method/esign.esign.overrides.web_form.download_signed_pdf?{params}"
+				context.signed_pdf_name = signed_pdf.get("file_name")
+
 		return context
+
+	def _get_signed_pdf(self, doc: Document) -> dict | None:
+		"""Get the most recent signed PDF attachment for the document.
+
+		Looks for PDFs attached via the eSign Communication record.
+		"""
+		# First try to find an eSign Communication for this document
+		comm = frappe.get_all(
+			"Communication",
+			filters={
+				"reference_doctype": doc.doctype,
+				"reference_name": doc.name,
+				"communication_type": "eSign",
+			},
+			fields=["name"],
+			order_by="creation desc",
+			limit=1,
+		)
+
+		if comm:
+			# Get the PDF attached to the Communication
+			pdf_file = frappe.get_all(
+				"File",
+				filters={
+					"attached_to_doctype": "Communication",
+					"attached_to_name": comm[0].name,
+					"file_name": ("like", "%.pdf"),
+				},
+				fields=["name", "file_name", "file_url"],
+				order_by="creation desc",
+				limit=1,
+			)
+			if pdf_file:
+				return pdf_file[0]
+
+		# Fallback: look for signed PDFs attached directly to the document
+		pdf_file = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": doc.doctype,
+				"attached_to_name": doc.name,
+				"file_name": ("like", "%_signed_%.pdf"),
+			},
+			fields=["name", "file_name", "file_url"],
+			order_by="creation desc",
+			limit=1,
+		)
+		if pdf_file:
+			return pdf_file[0]
+
+		return None
 
 	def _check_signature_exists(self, doc: Document) -> bool:
 		"""Check if all signature fields in the web form already have values."""
@@ -438,6 +500,101 @@ def get_print_html(
 		print_html=print_html,
 		print_style=print_style,
 	)
+
+
+@frappe.whitelist(allow_guest=True)
+@rate_limit(key="esign_download", limit=20, seconds=60)
+def download_signed_pdf(doctype: str, docname: str, key: str = ""):
+	"""Download a signed PDF attachment with key-based access validation.
+
+	This endpoint allows Guest users to download private signed PDF files
+	by validating access via the document share key instead of requiring login.
+
+	Args:
+		doctype: The DocType of the document
+		docname: The name of the document
+		key: The document share key for access validation
+
+	Returns:
+		The PDF file response
+	"""
+	import os
+
+	from frappe.core.doctype.access_log.access_log import make_access_log
+	from frappe.utils.response import send_private_file
+
+	# Get the document without permission checks - we'll validate via share key
+	doc = frappe.get_doc(doctype, docname, check_permission=False)
+	doc.flags.ignore_permissions = True
+
+	# Validate access via share key - require key for guest access
+	validate_esign_key(key, doc, require_key=(frappe.session.user == "Guest"))
+
+	# Find the signed PDF for this document
+	# First try to find an eSign Communication for this document
+	comm = frappe.get_all(
+		"Communication",
+		filters={
+			"reference_doctype": doctype,
+			"reference_name": docname,
+			"communication_type": "eSign",
+		},
+		fields=["name"],
+		order_by="creation desc",
+		limit=1,
+	)
+
+	pdf_file = None
+	if comm:
+		# Get the PDF attached to the Communication
+		pdf_file = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "Communication",
+				"attached_to_name": comm[0].name,
+				"file_name": ("like", "%.pdf"),
+			},
+			fields=["name", "file_name", "file_url", "is_private"],
+			order_by="creation desc",
+			limit=1,
+		)
+
+	if not pdf_file:
+		# Fallback: look for signed PDFs attached directly to the document
+		pdf_file = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": doctype,
+				"attached_to_name": docname,
+				"file_name": ("like", "%_signed_%.pdf"),
+			},
+			fields=["name", "file_name", "file_url", "is_private"],
+			order_by="creation desc",
+			limit=1,
+		)
+
+	if not pdf_file:
+		frappe.throw(_("No signed PDF found for this document"), frappe.DoesNotExistError)
+
+	file_doc = pdf_file[0]
+	file_url = file_doc.get("file_url", "")
+
+	# Log access for audit trail
+	make_access_log(
+		doctype="File",
+		document=file_doc.get("name"),
+		file_type="pdf",
+	)
+
+	# Handle private vs public files
+	if file_doc.get("is_private") and file_url.startswith("/private/files/"):
+		# Extract the path after /private
+		private_path = file_url.split("/private", 1)[1]
+		return send_private_file(private_path)
+	else:
+		# For public files, redirect to the file URL
+		frappe.local.response["type"] = "redirect"
+		frappe.local.response["location"] = file_url
 
 
 @frappe.whitelist()

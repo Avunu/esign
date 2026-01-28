@@ -157,7 +157,15 @@ window.refreshPrintHtml = refreshPrintHtml;
  * Initialize document preview functionality
  */
 function initDocumentPreview() {
-	// Load print HTML
+	const ctx = frappe.esign_context;
+
+	// Skip loading print HTML if we have a signed PDF (completed documents)
+	if (ctx && ctx.signed_pdf_url) {
+		console.debug("Signed PDF available, skipping print HTML load");
+		return;
+	}
+
+	// Load print HTML for documents that need signing
 	loadPrintHtml();
 
 	// Re-scale on window resize with debouncing

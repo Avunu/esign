@@ -12,7 +12,8 @@
 		doctype: {{ doctype | tojson }},
 		name: {{ name | tojson }},
 		key: {{ key | tojson }},
-		print_format: {{ print_format | tojson }}
+		print_format: {{ print_format | tojson }},
+		signed_pdf_url: {{ signed_pdf_url | default('') | tojson }}
 	};
 </script>
 {% endblock %}
@@ -36,12 +37,18 @@
 			<button type="button" class="btn btn-primary btn-sm esign-scroll-to-form d-lg-none">
 				{{ _("Sign Now") }}
 			</button>
-			{% endif %}
 			<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-sm">
 				<svg class="icon icon-sm"><use href="#icon-download"></use></svg>
 				<span class="d-none d-sm-inline">{{ _("Download PDF") }}</span>
 				<span class="d-sm-none">{{ _("PDF") }}</span>
 			</a>
+			{% elif signed_pdf_url %}
+			<a href="{{ signed_pdf_url }}" target="_blank" class="btn btn-primary btn-sm">
+				<svg class="icon icon-sm"><use href="#icon-download"></use></svg>
+				<span class="d-none d-sm-inline">{{ _("Download Signed Document") }}</span>
+				<span class="d-sm-none">{{ _("Download") }}</span>
+			</a>
+			{% endif %}
 		</div>
 	</header>
 
@@ -49,6 +56,12 @@
 	<div class="esign-main">
 		<!-- Document Viewer (Center/Left) -->
 		<div class="esign-document-pane">
+			{% if is_completed and signed_pdf_url %}
+			<!-- Signed PDF embed for completed documents -->
+			<div id="signed-pdf-container" class="esign-pdf-embed">
+				<embed src="{{ signed_pdf_url }}" type="application/pdf" width="100%" height="100%">
+			</div>
+			{% else %}
 			<div id="print-view-container">
 				<!-- Declarative shadow DOM for print content -->
 				<div id="shadow-host">
@@ -102,6 +115,7 @@
 					</template>
 				</div>
 			</div>
+			{% endif %}
 		</div>
 
 		<!-- Sidebar (Right) - Form or Success -->
@@ -114,6 +128,12 @@
 				</div>
 				<h2 class="esign-success-title">{{ _("Document Signed") }}</h2>
 				<p class="esign-success-message">{{ _("This document has been signed. Thank you!") }}</p>
+				{% if signed_pdf_url %}
+				<a href="{{ signed_pdf_url }}" target="_blank" class="btn btn-primary btn-lg btn-block mt-4">
+					<svg class="icon icon-sm"><use href="#icon-download"></use></svg>
+					{{ _("Download Signed Document") }}
+				</a>
+				{% endif %}
 			</div>
 			{% else %}
 			<!-- Mobile QR Code (shown on desktop when force_mobile is true) -->
