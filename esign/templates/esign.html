@@ -38,13 +38,15 @@
 				{{ _("Sign Now") }}
 			</button>
 			<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-sm">
-				<svg class="icon icon-sm"><use href="#icon-download"></use></svg>
+				<!-- <svg class="icon icon-sm"><use href="#es-line-download"></use></svg> -->
+				<i class="octicon octicon-desktop-download"></i>
 				<span class="d-none d-sm-inline">{{ _("Download PDF") }}</span>
 				<span class="d-sm-none">{{ _("PDF") }}</span>
 			</a>
 			{% elif signed_pdf_url %}
 			<a href="{{ signed_pdf_url }}" target="_blank" class="btn btn-primary btn-sm">
-				<svg class="icon icon-sm"><use href="#icon-download"></use></svg>
+				<!-- <svg class="icon icon-sm"><use href="#es-line-download"></use></svg> -->
+				<i class="octicon octicon-desktop-download"></i>
 				<span class="d-none d-sm-inline">{{ _("Download Signed Document") }}</span>
 				<span class="d-sm-none">{{ _("Download") }}</span>
 			</a>
