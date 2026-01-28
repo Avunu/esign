@@ -45,11 +45,6 @@ def send_esign_email(
 ):
 	"""Send eSign email with embedded eSign link"""
 
-	frappe.log_error(
-		title=f"eSign: Sending email for {doctype} {name}",
-		message=f"Recipients: {recipients}, Subject: {subject}, Web Form: {web_form}",
-	)
-
 	# Validate inputs
 	if not all([doctype, name, recipients, subject, message, web_form]):
 		frappe.throw(_("Missing required parameters for eSign email"))
