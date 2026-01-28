@@ -340,7 +340,7 @@ def get_print_html(
 	"""Get the print HTML and styles for a document.
 
 	This endpoint allows async loading of the document preview in eSign forms.
-	It validates permissions using the document share key from the referrer.
+	It validates permissions using the document share key if provided.
 
 	Args:
 		doctype: The DocType of the document
@@ -400,6 +400,9 @@ def get_print_html(
 		style=frappe.form_dict.get("style"),
 		print_format=print_format_doc,  # type: ignore
 	)
+
+	# Clean up any local message log
+	frappe.local.message_log = None
 
 	return PrintHtmlResponse(
 		print_html=print_html,
@@ -570,6 +573,9 @@ def accept(web_form, data):
 
 	# Enqueue PDF attachment as background job
 	_enqueue_print_attachment(doc, wf)
+
+	# Clean up any local message log
+	frappe.local.message_log = None
 
 	return doc
 
