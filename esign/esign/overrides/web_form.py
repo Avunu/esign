@@ -169,7 +169,9 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 				from urllib.parse import urlencode
 
 				params = urlencode({"doctype": self.doc_type, "docname": cur_doc_name, "key": key})
-				context.signed_pdf_url = f"/api/method/esign.esign.overrides.web_form.download_signed_pdf?{params}"
+				context.signed_pdf_url = (
+					f"/api/method/esign.esign.overrides.web_form.download_signed_pdf?{params}"
+				)
 				context.signed_pdf_name = signed_pdf.get("file_name")
 
 		return context
@@ -518,8 +520,6 @@ def download_signed_pdf(doctype: str, docname: str, key: str = ""):
 	Returns:
 		The PDF file response
 	"""
-	import os
-
 	from frappe.core.doctype.access_log.access_log import make_access_log
 	from frappe.utils.response import send_private_file
 
