@@ -24,6 +24,37 @@ class PrintHtmlResponse(TypedDict):
 	print_style: str
 
 
+def validate_esign_key(key: str, doc: Document, require_key: bool = False) -> bool:
+	"""Validate document share key for eSign access.
+
+	Args:
+		key: The share key to validate
+		doc: The document to validate access for
+		require_key: If True, raises error when no key provided. If False, falls back
+			to standard permission check when no key.
+
+	Returns:
+		True if access is granted (either via valid key or fallback permissions)
+
+	Raises:
+		frappe.PermissionError: If key is invalid/expired or no access granted
+	"""
+	from frappe.www.printview import validate_key
+
+	if key:
+		# validate_key returns False if key not found, None if valid
+		if validate_key(key, doc) is False:
+			frappe.throw(_("Invalid or expired document access key"), frappe.PermissionError)
+		return True
+
+	if require_key:
+		frappe.throw(_("Document access key required"), frappe.PermissionError)
+
+	# No key provided - fall back to standard permission check
+	validate_print_permission(doc)
+	return True
+
+
 # Import PaymentWebForm if available, otherwise create a dummy class
 try:
 	from payments.overrides.payment_webform import PaymentWebForm  # type: ignore
@@ -69,10 +100,16 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		if not self.esign_enabled or not cur_doc_name or frappe.form_dict.is_list:
 			super().get_context(context)
 			return context
+
+		key = frappe.form_dict.get("key", "")
+
+		# Get document without permission check - we'll validate via share key
 		doc = frappe.get_doc(self.doc_type, cur_doc_name, check_permission=False)
 		doc.flags.ignore_permissions = True
-		# validate either the user permissions or the access key
-		validate_print_permission(doc)
+
+		# Validate access via share key or fallback to standard permissions
+		validate_esign_key(key, doc)
+
 		# Allow public access to the web form if validation passes
 		print_format = frappe.form_dict.get("format", self.print_format) or "standard"
 
@@ -99,7 +136,6 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		form_fields.add("doctype")
 		context.reference_doc = {k: v for k, v in doc.as_dict().items() if k in form_fields}
 
-		key = frappe.form_dict.get("key", "")
 		context.key = key  # Pass key to frontend for async API calls
 		context.printview_url = (
 			"/api/method/frappe.utils.print_format.download_pdf?"
@@ -160,15 +196,16 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 			if not frappe.form_dict.get("key"):
 				frappe.form_dict.key = extract_param_from_referrer("key")
 
-			# If we have a key, validate it
-			if frappe.form_dict.get("key"):
+			# Validate via share key if provided
+			key = frappe.form_dict.get("key")
+			if key:
 				try:
 					doc = frappe.get_doc(doctype, name, check_permission=False)
 					doc.flags.ignore_permissions = True
-					validate_print_permission(doc)
+					validate_esign_key(key, doc, require_key=True)
 					return True
-				except (frappe.PermissionError, frappe.exceptions.LinkExpired):
-					# Key validation failed, fall through to normal permission check
+				except frappe.PermissionError:
+					# Invalid key - fall through to normal permission check
 					pass
 
 		# Fall back to parent method
@@ -369,15 +406,8 @@ def get_print_html(
 	# This prevents msgprint warnings from has_permission checks
 	frappe.flags.ignore_print_permissions = True
 
-	# Validate the share key directly (avoids permission warning messages)
-	if key:
-		from frappe.www.printview import validate_key
-
-		if validate_key(key, doc) is False:
-			frappe.throw(_("Invalid or expired document access key"), frappe.PermissionError)
-	else:
-		# No key provided - fall back to standard permission check
-		validate_print_permission(doc)
+	# Validate access via share key or fallback to standard permissions
+	validate_esign_key(key, doc)
 
 	# Get print format document
 	meta = frappe.get_meta(doctype)
