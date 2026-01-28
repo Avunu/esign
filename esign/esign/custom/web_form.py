@@ -13,6 +13,7 @@ from frappe.model.document import Document
 from frappe.rate_limiter import rate_limit
 from frappe.twofactor import get_qr_svg_code
 from frappe.types import DF
+from frappe.utils import get_frappe_version
 from frappe.website.doctype.web_form.web_form import WebForm as BaseWebForm
 from frappe.www.printview import validate_print_permission
 
@@ -173,6 +174,8 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 					f"/api/method/esign.esign.custom.web_form.download_signed_pdf?{params}"
 				)
 				context.signed_pdf_name = signed_pdf.get("file_name")
+
+		context.frappe_version = get_frappe_version()
 
 		return context
 
@@ -700,7 +703,9 @@ def accept(web_form, data):
 			)
 
 	# Set docstatus for submission if configured (before save)
-	should_submit = wf.esign_submit_on_response and doc.docstatus == 0 and doc.meta.is_submittable
+	should_submit = (
+		wf.esign_submit_on_response and doc.docstatus == 0 and getattr(doc.meta, "is_submittable", False)
+	)
 	if should_submit:
 		doc.flags.ignore_permissions = True
 		doc.docstatus = DocStatus(1)
