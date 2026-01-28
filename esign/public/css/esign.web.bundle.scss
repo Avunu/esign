@@ -425,4 +425,53 @@
 			max-height: none;
 		}
 	}
+
+	// ============================================
+	// Toast/Alert Positioning Override
+	// ============================================
+	#alert-container {
+		right: auto !important;
+		left: 50% !important;
+		transform: translateX(-50%) !important;
+		bottom: 20px !important;
+		
+		// Center the alerts within the container
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	// Override toast animations for bottom-center positioning
+	.desk-alert {
+		-webkit-animation-name: slideUpFade !important;
+		animation-name: slideUpFade !important;
+
+		&.out {
+			-webkit-animation-name: slideDownFade !important;
+			animation-name: slideDownFade !important;
+		}
+	}
+
+	@keyframes slideUpFade {
+		0% {
+			transform: translateY(100px);
+			opacity: 0;
+		}
+		100% {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@keyframes slideDownFade {
+		0% {
+			opacity: 1;
+			transform: translateY(0);
+		}
+		100% {
+			opacity: 0;
+			transform: translateY(50px);
+		}
+	}
 }

@@ -290,7 +290,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		this.set_value(base64_data);
 		this.value = base64_data;
 		this.refresh_input();
-		frappe.show_alert({
+		frappe.toast({
 			message: __("Signature added successfully"),
 			indicator: "green",
 		});
