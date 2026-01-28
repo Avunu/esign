@@ -8,6 +8,16 @@ app_license = "mit"
 app_include_js = ["esign.bundle.js", "esign.control.bundle.js"]
 app_include_css = ["esign.control.bundle.css"]
 
+# Install/migrate hooks for communication type registration
+after_install = "esign.esign.config.after_install"
+after_migrate = "esign.esign.config.after_migrate"
+after_uninstall = "esign.esign.config.after_uninstall"
+
+# Timeline integration for eSign audit trail
+additional_timeline_content = {
+	"*": ["esign.esign.hooks.get_timeline_content"],
+}
+
 
 doctype_js = {
 	"Web Form": "public/js/web_form.js",

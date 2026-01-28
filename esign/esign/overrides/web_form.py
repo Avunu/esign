@@ -1,10 +1,13 @@
+import hashlib
 import json
+from datetime import datetime
 from typing import TypedDict, cast
 
 import frappe
 from frappe import _
 from frappe.core.doctype.file.file import File
 from frappe.core.doctype.file.utils import remove_file_by_url
+from frappe.core.doctype.user.user import User
 from frappe.model.docstatus import DocStatus
 from frappe.model.document import Document
 from frappe.rate_limiter import rate_limit
@@ -28,6 +31,19 @@ class RequestData(TypedDict):
 	host: str | None
 	headers: dict
 	method: str | None
+
+
+class AuditData(TypedDict):
+	"""Audit trail data captured at signing time."""
+
+	timestamp: str
+	ip_address: str | None
+	user_agent: str | None
+	signer_email: str | None
+	signer_name: str | None
+	web_form: str
+	print_format: str
+	signed_fields: list[str]
 
 
 class EsignWebForm(PaymentWebForm, BaseWebForm):
@@ -98,7 +114,8 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		context.doctype = self.doc_type
 		context.name = cur_doc_name
 		context.print_format = print_format
-		context.reference_doc = doc
+		form_fields = [field.fieldname for field in self.web_form_fields]
+		context.reference_doc = doc.as_dict()
 
 		# Add print view content and styles to context
 		context.print_html = print_html
@@ -144,11 +161,6 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		# Check if ALL signature fields have non-empty values
 		for fieldname in signature_fields:
 			value = doc.get(fieldname)
-			# debug
-			frappe.log_error(
-				title="eSign: Checking signature field",
-				message=f"Field: {fieldname}, Value: {value}",
-			)
 			if not value or str(value) == "/assets/frappe/images/signature-placeholder.png":
 				return False
 
@@ -183,32 +195,50 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		return super().has_web_form_permission(doctype, name, ptype)
 
 
-def attach_print_to_document(doc, print_format: str, request_data: RequestData):
-	"""Background job to attach the signed PDF to the document."""
-	from datetime import datetime
+def attach_print_to_document(
+	doc: Document,
+	print_format: str,
+	request_data: RequestData,
+	audit_data: AuditData,
+):
+	"""Background job to attach the signed PDF to the document.
 
+	Also records audit trail and SHA-256 hash for document integrity verification.
+	Creates a Communication record for timeline display via additional_timeline_content hook.
+	"""
 	from frappe import attach_print
 
 	frappe.local.request = frappe._dict(
 		{
-			"host_url": request_data["host_url"],
-			"scheme": request_data.get("scheme", "https"),
-			"host": request_data.get("host"),
 			"headers": request_data.get("headers", {}),
+			"host_url": request_data["host_url"],
+			"host": request_data.get("host"),
 			"method": request_data.get("method", "GET"),
+			"no_cache": True,
+			"scheme": request_data.get("scheme", "https"),
 		}
 	)
 
+	# disable cache for print generation
+	if frappe.request:
+		frappe.request.cache_control = frappe._dict({"no_cache": True})
+
+	# Generate the PDF
+	timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 	print_data = attach_print(
 		doctype=doc.doctype,
 		name=doc.name,
-		file_name=f"{doc.name}_filled_{datetime.now()}",
+		file_name=f"{doc.name}_signed_{timestamp_str}",
 		print_format=print_format,
 		doc=doc,
 		print_letterhead=False,
 	)
 
-	# Create and save the file document
+	# Compute SHA-256 hash of the PDF content
+	pdf_content = print_data["fcontent"]
+	pdf_hash = hashlib.sha256(pdf_content).hexdigest()
+
+	# Attach the signed PDF to the document
 	file_doc = frappe.get_doc(
 		{
 			"doctype": "File",
@@ -217,13 +247,49 @@ def attach_print_to_document(doc, print_format: str, request_data: RequestData):
 			"attached_to_name": doc.name,
 			"folder": "Home/Attachments",
 			"is_private": True,
-			"content": print_data["fcontent"],
+			"content": pdf_content,
+		}
+	)
+	file_doc.save(ignore_permissions=True)
+
+	# Create Communication record for timeline display with audit data as JSON
+	audit_content = json.dumps(
+		{
+			**audit_data,
+			"pdf_hash": pdf_hash,
+			"file_name": print_data["fname"],
 		}
 	)
 
-	file_doc.save(ignore_permissions=True)
+	comm = frappe.get_doc(
+		{
+			"doctype": "Communication",
+			"communication_type": "eSign",
+			"subject": f"Document signed: {doc.name}",
+			"content": audit_content,
+			"reference_doctype": doc.doctype,
+			"reference_name": doc.name,
+			"sender": audit_data.get("signer_email"),
+			"sender_full_name": audit_data.get("signer_name"),
+			"communication_date": datetime.now(),
+			"sent_or_received": "Received",
+		}
+	)
+	comm.insert(ignore_permissions=True)
 
-	doc.add_comment("Comment", _(f"eSign document attached: {print_data['fname']}"))
+	# Also attach a copy of the PDF to the Communication for easy retrieval
+	comm_file_doc = frappe.get_doc(
+		{
+			"doctype": "File",
+			"file_name": print_data["fname"],
+			"attached_to_doctype": "Communication",
+			"attached_to_name": comm.name,
+			"folder": "Home/Attachments",
+			"is_private": True,
+			"content": pdf_content,
+		}
+	)
+	comm_file_doc.save(ignore_permissions=True)
 
 
 def extract_param_from_referrer(param: str = "") -> str:
@@ -453,7 +519,7 @@ def accept(web_form, data):
 	return doc
 
 
-def _enqueue_print_attachment(doc, wf: "EsignWebForm"):
+def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 	"""Enqueue background job to attach signed PDF to the document."""
 	# Determine the print format to use
 	print_format = extract_param_from_referrer("format")
@@ -479,6 +545,9 @@ def _enqueue_print_attachment(doc, wf: "EsignWebForm"):
 		else:
 			request_data[attr] = default
 
+	# Collect audit data
+	audit_data = _collect_audit_data(doc, wf, print_format)
+
 	frappe.enqueue(
 		attach_print_to_document,
 		queue="short",
@@ -488,4 +557,70 @@ def _enqueue_print_attachment(doc, wf: "EsignWebForm"):
 		doc=doc,
 		print_format=print_format,
 		request_data=request_data,
+		audit_data=audit_data,
 	)
+
+
+def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) -> AuditData:
+	"""Collect audit trail data at the moment of signing."""
+	# Get IP address from various possible headers (proxy-aware)
+	ip_address = _get_client_ip()
+
+	# Get user agent
+	user_agent = None
+	if hasattr(frappe, "request") and frappe.request:
+		user_agent = frappe.request.headers.get("User-Agent")
+
+	# Get signer information
+	signer_email = None
+	signer_name = None
+	if frappe.session.user and frappe.session.user != "Guest":
+		signer_email = frappe.session.user
+		user_doc = cast(User, frappe.get_cached_doc("User", frappe.session.user))
+		signer_name = user_doc.full_name if user_doc else None
+
+	# Identify which signature fields were filled
+	signed_fields = []
+	signature_fieldtypes = ("Signature", "SignaturePad")
+	for field in wf.web_form_fields:
+		if field.fieldtype in signature_fieldtypes:
+			value = doc.get(field.fieldname)
+			if value:
+				signed_fields.append(field.label or field.fieldname)
+
+	return AuditData(
+		timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+		ip_address=ip_address,
+		user_agent=user_agent,
+		signer_email=signer_email,
+		signer_name=signer_name,
+		web_form=str(wf.title or wf.name),
+		print_format=print_format,
+		signed_fields=signed_fields,
+	)
+
+
+def _get_client_ip() -> str | None:
+	"""Get client IP address, accounting for proxies and load balancers."""
+	if not hasattr(frappe, "request") or not frappe.request:
+		return None
+
+	headers = frappe.request.headers
+
+	# Check various proxy headers in order of preference
+	proxy_headers = [
+		"CF-Connecting-IP",  # Cloudflare
+		"X-Real-IP",  # Nginx proxy
+		"X-Forwarded-For",  # Standard proxy header (may contain multiple IPs)
+	]
+
+	for header in proxy_headers:
+		value = headers.get(header)
+		if value:
+			# X-Forwarded-For may contain multiple IPs, take the first (client)
+			if "," in value:
+				return value.split(",")[0].strip()
+			return value.strip()
+
+	# Fall back to remote_addr
+	return getattr(frappe.request, "remote_addr", None)

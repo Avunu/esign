@@ -1,0 +1,61 @@
+<div class="timeline-message-box" data-communication-type="eSign">
+	<span class="flex justify-between m-1 mb-3">
+		<span class="text-color flex">
+			<span>{{ __("Document signed") }}{% if (signer_name) { %} {{ __("by") }} <strong>{{ signer_name }}</strong>{% } %}
+				<div class="text-muted">{{ comment_when(timestamp || creation) }}</div>
+			</span>
+		</span>
+		<span class="actions" style="flex-shrink: 0">
+			<span class="indicator-pill green">
+				{{ __("Signed") }}
+			</span>
+
+			{% if (file_url) { %}
+			<a class="action-btn" target="_blank" href="{{ file_url }}" title="{{ __('Open Signed PDF') }}">
+				<svg class="es-icon icon-sm">
+					<use href="#es-line-link"></use>
+				</svg>
+			</a>
+			{% } %}
+		</span>
+	</span>
+	<div class="content small">
+		<div class="mb-2">
+			<strong>{{ __("Document Integrity") }}</strong>
+			<div class="text-muted" style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">
+				SHA-256: {{ pdf_hash }}
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-sm-6">
+				<strong>{{ __("Signing Details") }}</strong>
+				<ul class="list-unstyled text-muted mb-0">
+					{% if (signer_email) { %}
+					<li>{{ __("Email") }}: {{ signer_email }}</li>
+					{% } %}
+					{% if (ip_address) { %}
+					<li>{{ __("IP") }}: {{ ip_address }}</li>
+					{% } %}
+					{% if (web_form) { %}
+					<li>{{ __("Form") }}: {{ web_form }}</li>
+					{% } %}
+				</ul>
+			</div>
+			<div class="col-sm-6">
+				{% if (signed_fields && signed_fields.length) { %}
+				<strong>{{ __("Signed Fields") }}</strong>
+				<ul class="list-unstyled text-muted mb-0">
+					{% for (let field of signed_fields) { %}
+					<li>✓ {{ field }}</li>
+					{% } %}
+				</ul>
+				{% } %}
+			</div>
+		</div>
+		{% if (user_agent) { %}
+		<div class="text-muted mt-2" style="font-size: 0.7rem; word-break: break-all;">
+			{{ __("User Agent") }}: {{ user_agent }}
+		</div>
+		{% } %}
+	</div>
+</div>

@@ -1,3 +1,5 @@
+import "./templates/esign_timeline.html";
+
 $(document).on("form-refresh", function (event, frm) {
 	frappe
 		.call("esign.esign.can_esign", {

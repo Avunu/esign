@@ -46,9 +46,9 @@
 
 /* Signature Canvas Container */
 .signature-canvas-container {
+    aspect-ratio: 5 / 2;
 	position: relative;
 	width: 100%;
-	min-height: 200px;
 	border: 1px solid var(--border-color);
 	border-radius: var(--border-radius);
 	background: var(--control-bg);

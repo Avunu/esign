@@ -40,7 +40,9 @@ class EsignWebForm extends WebForm {
 
 	handle_redirect() {
 		// Countdown and redirect
-		const timeSpan = document.querySelector(".esign-redirect-message .time");
+		const timeSpan = document.querySelector(
+			".esign-redirect-message .time",
+		);
 		if (!timeSpan) {
 			window.location.href = this.success_url;
 			return;
