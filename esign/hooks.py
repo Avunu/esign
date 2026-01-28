@@ -23,7 +23,7 @@ doctype_js = {
 	"Web Form": "public/js/web_form.js",
 }
 
-extend_doctype_class = {
+override_doctype_class = {
 	"Web Form": "esign.esign.overrides.web_form.EsignWebForm",
 	"Email Template": "esign.esign.overrides.email_template.EsignEmailTemplate",
 }
