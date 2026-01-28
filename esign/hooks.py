@@ -1,3 +1,6 @@
+from frappe.utils import get_frappe_version
+frappe_version = int(get_frappe_version().split(".")[0])
+
 app_name = "esign"
 app_title = "eSign"
 app_publisher = "Avunu LLC"
@@ -23,10 +26,17 @@ doctype_js = {
 	"Web Form": "public/js/web_form.js",
 }
 
-override_doctype_class = {
-	"Web Form": "esign.esign.custom.web_form.EsignWebForm",
-	"Email Template": "esign.esign.custom.email_template.EsignEmailTemplate",
-}
+if frappe_version == 16:
+	extend_doctype_class = {
+		"Web Form": "esign.esign.custom.web_form.EsignWebForm",
+		"Email Template": "esign.esign.custom.email_template.EsignEmailTemplate",
+	}
+else:
+	override_doctype_class = {
+		"Web Form": "esign.esign.custom.web_form.EsignWebForm",
+		"Email Template": "esign.esign.custom.email_template.EsignEmailTemplate",
+	}
+	
 
 jinja = {
 	"methods": [
