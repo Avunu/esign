@@ -170,7 +170,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 
 				params = urlencode({"doctype": self.doc_type, "docname": cur_doc_name, "key": key})
 				context.signed_pdf_url = (
-					f"/api/method/esign.esign.overrides.web_form.download_signed_pdf?{params}"
+					f"/api/method/esign.esign.custom.web_form.download_signed_pdf?{params}"
 				)
 				context.signed_pdf_name = signed_pdf.get("file_name")
 

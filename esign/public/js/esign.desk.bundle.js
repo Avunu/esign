@@ -161,7 +161,7 @@ class ESignDialog {
 		await this.load_contact_list_cache();
 
 		frappe.call({
-			method: "esign.esign.overrides.web_form.get_esign_web_forms",
+			method: "esign.esign.custom.web_form.get_esign_web_forms",
 			args: { doctype: this.frm.doctype },
 			callback: (r) => {
 				if (r.message && r.message.length > 0) {
@@ -284,7 +284,7 @@ class ESignDialog {
 
 		if (web_form) {
 			frappe.call({
-				method: "esign.esign.overrides.web_form.get_esign_link",
+				method: "esign.esign.custom.web_form.get_esign_link",
 				args: {
 					doc: this.frm.doc,
 					web_form_name: web_form,

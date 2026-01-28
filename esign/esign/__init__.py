@@ -127,7 +127,7 @@ def send_esign_email(
 		frappe.throw(_("Document {0} {1} not found").format(doctype, name))
 
 	# Validate web form
-	from esign.esign.overrides.web_form import EsignWebForm, get_esign_link
+	from esign.esign.custom.web_form import EsignWebForm, get_esign_link
 
 	try:
 		web_form_doc = EsignWebForm("Web Form", web_form)

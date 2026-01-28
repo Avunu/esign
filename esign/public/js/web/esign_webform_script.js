@@ -76,7 +76,7 @@ function loadPrintHtml() {
 
 	return frappe
 		.call({
-			method: "esign.esign.overrides.web_form.get_print_html",
+			method: "esign.esign.custom.web_form.get_print_html",
 			args: {
 				doctype: ctx.doctype,
 				docname: ctx.name,
@@ -251,7 +251,7 @@ class EsignWebForm extends WebForm {
 	save() {
 		// Use eSign accept endpoint if esign_enabled, otherwise use default
 		let method = this.esign_enabled
-			? "esign.esign.overrides.web_form.accept"
+			? "esign.esign.custom.web_form.accept"
 			: "frappe.website.doctype.web_form.web_form.accept";
 
 		// debug
