@@ -129,20 +129,13 @@ export class ControlFontSelect extends frappe.ui.form.ControlData {
 		// Bind click handlers for options
 		this.options_container.addEventListener("click", (e) => {
 			const optionButton = e.target.closest(".font-select-option");
-			console.log("FontSelect click event", {
-				optionButton,
-				target: e.target,
-			});
 			if (optionButton) {
 				const value = optionButton.dataset.value;
-				console.log("FontSelect setting value:", value);
-				this.set_value(value);
+				// Update internal value and display
+				this.set_input(value);
 				this.popover_element.hidePopover();
 				// Trigger onchange callback
-				console.log("FontSelect df:", this.df);
-				console.log("FontSelect df.onchange:", this.df.onchange);
 				if (this.df.onchange) {
-					console.log("FontSelect calling onchange");
 					this.df.onchange();
 				}
 			}

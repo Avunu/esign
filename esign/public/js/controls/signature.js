@@ -136,6 +136,15 @@ class MockForm {
 }
 
 export class ControlSignature extends frappe.ui.form.ControlData {
+	/**
+	 * Gets the term to use for "signature" from df.options.
+	 * Defaults to "Signature" if not specified.
+	 * @returns {string}
+	 */
+	get_signature_term() {
+		return this.df.options?.trim() || "Signature";
+	}
+
 	make() {
 		super.make();
 
@@ -150,6 +159,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 
 		// make a pointer to value
 		this.value = this.get_value();
+
+		// Get the overlay text with the correct term
+		const overlayText = __("Add your {0}", [
+			this.get_signature_term().toLowerCase(),
+		]);
 
 		// Define structure using hast (HTML Abstract Syntax Tree)
 		// Structure: div.signature-canvas-container > [canvas, div.signature-overlay > div.signature-overlay-text > [svg, div]]
@@ -188,7 +202,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 									children: [
 										{
 											type: "text",
-											value: __("Add your signature"),
+											value: overlayText,
 										},
 									],
 								},
@@ -243,8 +257,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		// Get available fonts filtered by system availability
 		const fontOptions = await getAvailableFonts();
 
+		// Get the term to use (e.g., "Signature" or "Initials")
+		const term = this.get_signature_term();
+		const termLower = term.toLowerCase();
+
 		let signature_dialog = new frappe.ui.Dialog({
-			title: __("Add your signature"),
+			title: __("Add your {0}", [termLower]),
 			fields: [
 				{
 					label: __("Draw"),
@@ -253,7 +271,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					active: true,
 				},
 				{
-					label: __("Draw Your Signature"),
+					label: __("Draw Your {0}", [term]),
 					fieldtype: "SignaturePad",
 					fieldname: "signature_draw",
 				},
@@ -266,7 +284,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					fieldtype: "Column Break",
 				},
 				{
-					label: __("Type Your Signature"),
+					label: __("Type Your {0}", [term]),
 					fieldtype: "Data",
 					fieldname: "signature_typed",
 					input_class: "signature-typed-input",
@@ -300,7 +318,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					fieldname: "tab_upload",
 				},
 				{
-					label: __("Upload Your Signature"),
+					label: __("Upload Your {0}", [term]),
 					fieldtype: "Upload",
 					fieldname: "signature_upload",
 					options: {
@@ -310,7 +328,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			],
 			frm: new MockForm(this),
 			size: "large",
-			primary_action_label: __("Insert Signature"),
+			primary_action_label: __("Insert {0}", [term]),
 			primary_action: function () {
 				const current_tab =
 					signature_dialog.frm.active_tab?.df.fieldname || null;
@@ -331,7 +349,9 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 						me.set_signature_value(signature_data, "draw");
 						signature_dialog.hide();
 					} else {
-						frappe.msgprint(__("Please draw a signature first"));
+						frappe.msgprint(
+							__("Please draw a {0} first", [termLower]),
+						);
 					}
 				} else if (current_tab === "tab_type") {
 					let typed_signature =
@@ -347,7 +367,9 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 							signature_dialog.hide();
 						});
 					} else {
-						frappe.msgprint(__("Please enter a signature text"));
+						frappe.msgprint(
+							__("Please enter {0} text", [termLower]),
+						);
 					}
 				} else if (current_tab === "tab_upload") {
 					let uploaded_signature =
@@ -360,11 +382,15 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 							},
 						);
 					} else {
-						frappe.msgprint(__("Please upload a signature image"));
+						frappe.msgprint(
+							__("Please upload a {0} image", [termLower]),
+						);
 					}
 				} else {
 					frappe.msgprint(
-						__("Please select a method to add your signature"),
+						__("Please select a method to add your {0}", [
+							termLower,
+						]),
 					);
 				}
 			},
@@ -548,6 +574,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		// Update overlay text and interaction
 		if (can_write) {
 			this.canvas_container.classList.remove("readonly");
+			const termLower = this.get_signature_term().toLowerCase();
 
 			// Update icon and label text based on current value
 			if (value) {
@@ -555,13 +582,15 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				const newIcon = toDom(createIconHast("edit", "md"));
 				this.overlay_text.replaceChild(newIcon, this.overlay_icon);
 				this.overlay_icon = newIcon;
-				this.overlay_label.textContent = __("Replace signature");
+				this.overlay_label.textContent = __("Replace {0}", [termLower]);
 			} else {
 				// Replace icon with add icon
 				const newIcon = toDom(createIconHast("add", "md"));
 				this.overlay_text.replaceChild(newIcon, this.overlay_icon);
 				this.overlay_icon = newIcon;
-				this.overlay_label.textContent = __("Add your signature");
+				this.overlay_label.textContent = __("Add your {0}", [
+					termLower,
+				]);
 			}
 		} else {
 			this.canvas_container.classList.add("readonly");
