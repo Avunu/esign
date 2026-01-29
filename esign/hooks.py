@@ -1,5 +1,6 @@
-from frappe.utils import get_frappe_version
-frappe_version = int(get_frappe_version().split(".")[0])
+import frappe
+
+frappe_version = int(frappe.__version__.split(".")[0])
 
 app_name = "esign"
 app_title = "eSign"
@@ -36,7 +37,7 @@ else:
 		"Web Form": "esign.esign.custom.web_form.EsignWebForm",
 		"Email Template": "esign.esign.custom.email_template.EsignEmailTemplate",
 	}
-	
+
 
 jinja = {
 	"methods": [
