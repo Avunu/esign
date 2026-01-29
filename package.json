@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "hast-util-to-dom": "^4.0.1",
     "signature_pad": "^5.1.1"
   },
   "devDependencies": {

@@ -1,4 +1,17 @@
 import SignaturePad from "signature_pad";
+import { toDom } from "hast-util-to-dom";
+import { createIconHast } from "./utils";
+
+/**
+ * @fileoverview SignaturePad control for Frappe Framework
+ * @description This module provides a signature pad control that allows users
+ * to draw signatures directly on a canvas. Uses HAST for DOM structure creation.
+ *
+ * @requires signature_pad - For canvas-based signature drawing
+ * @requires hast-util-to-dom - For efficient DOM structure creation
+ *
+ * @author Avunu LLC
+ */
 
 export class ControlSignaturePad extends frappe.ui.form.ControlData {
 	make() {
@@ -13,8 +26,48 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 				.text(__(this.df.label, null, this.df.parent));
 		}
 
-		me.body = document.createElement("div");
-		me.body.className = "signature-field";
+		// Define complete structure using hast (HTML Abstract Syntax Tree)
+		// Structure: div.signature-field > [canvas, div.signature-btn-row > a.signature-reset > svg]
+		const bodyStructure = {
+			type: "element",
+			tagName: "div",
+			properties: { className: ["signature-field"] },
+			children: [
+				{
+					type: "element",
+					tagName: "canvas",
+					properties: {
+						width: 750,
+						height: 292,
+					},
+					children: [],
+				},
+				{
+					type: "element",
+					tagName: "div",
+					properties: { className: ["signature-btn-row"] },
+					children: [
+						{
+							type: "element",
+							tagName: "a",
+							properties: {
+								href: "#",
+								type: "button",
+								className: [
+									"signature-reset",
+									"btn",
+									"icon-btn",
+								],
+							},
+							children: [createIconHast("es-line-reload", "sm")],
+						},
+					],
+				},
+			],
+		};
+
+		// Convert hast to DOM and prepend to wrapper
+		me.body = toDom(bodyStructure);
 		me.$input_wrapper[0].prepend(me.body);
 
 		new ResizeObserver(() => me.make_pad()).observe(this.body);
@@ -23,13 +76,13 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 	make_pad() {
 		let width = this.body.offsetWidth;
 		if (width > 0 && !this.signature_pad) {
-			// Create canvas with proper dimensions
-			this.canvas = document.createElement("canvas");
-			this.canvas.width = 750;
-			this.canvas.height = 292;
-			// this.canvas.style.cssText =
-			// 	"display: block; width: 100%; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); touch-action: none;";
-			this.body.appendChild(this.canvas);
+			// Get references via property accessors
+			// body.children[0] = canvas
+			// body.children[1] = div.signature-btn-row
+			// body.children[1].children[0] = a.signature-reset
+			this.canvas = this.body.children[0];
+			this.reset_button_wrapper = this.body.children[1];
+			const resetButton = this.reset_button_wrapper.children[0];
 
 			// Initialize signature_pad with options
 			this.signature_pad = new SignaturePad(this.canvas, {
@@ -42,23 +95,14 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 				this.on_save_sign();
 			});
 
-			// Create clear button
-			const buttonWrapper = document.createElement("div");
-			buttonWrapper.className = "signature-btn-row";
-			buttonWrapper.innerHTML = `
-				<a href="#" type="button" class="signature-reset btn icon-btn">
-					${frappe.utils.icon("es-line-reload", "sm")}
-				</a>
-			`;
-			buttonWrapper.addEventListener("click", (e) => {
+			// Handle reset button click
+			this.reset_button_wrapper.addEventListener("click", (e) => {
 				if (e.target.closest(".signature-reset")) {
 					e.preventDefault();
 					this.on_reset_sign();
 					return false;
 				}
 			});
-			this.body.appendChild(buttonWrapper);
-			this.reset_button_wrapper = buttonWrapper;
 
 			this.load_pad();
 			this.refresh_input();

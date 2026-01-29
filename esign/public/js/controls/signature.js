@@ -1,3 +1,17 @@
+import { toDom } from "hast-util-to-dom";
+import { createIconHast } from "./utils";
+
+/**
+ * @fileoverview Signature control for Frappe Framework
+ * @description This module provides a signature control that displays signatures
+ * and opens a dialog for drawing, typing, or uploading signatures.
+ * Uses HAST for DOM structure creation.
+ *
+ * @requires hast-util-to-dom - For efficient DOM structure creation
+ *
+ * @author Avunu LLC
+ */
+
 class MockForm {
 	constructor(control) {
 		this.doctype = "Signature Dialog";
@@ -59,26 +73,69 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		// make a pointer to value
 		this.value = this.get_value();
 
-		// Create signature canvas container
-		this.canvas_container = document.createElement("div");
-		this.canvas_container.className = "signature-canvas-container";
+		// Define structure using hast (HTML Abstract Syntax Tree)
+		// Structure: div.signature-canvas-container > [canvas, div.signature-overlay > div.signature-overlay-text > [svg, div]]
+		const containerStructure = {
+			type: "element",
+			tagName: "div",
+			properties: { className: ["signature-canvas-container"] },
+			children: [
+				{
+					type: "element",
+					tagName: "canvas",
+					properties: {
+						width: 750,
+						height: 292,
+						className: ["signature-display-canvas"],
+					},
+					children: [],
+				},
+				{
+					type: "element",
+					tagName: "div",
+					properties: { className: ["signature-overlay"] },
+					children: [
+						{
+							type: "element",
+							tagName: "div",
+							properties: {
+								className: ["signature-overlay-text"],
+							},
+							children: [
+								createIconHast("add", "md"),
+								{
+									type: "element",
+									tagName: "div",
+									properties: { style: "margin-top: 8px;" },
+									children: [
+										{
+											type: "text",
+											value: __("Add your signature"),
+										},
+									],
+								},
+							],
+						},
+					],
+				},
+			],
+		};
+
+		// Convert hast to DOM and prepend to wrapper
+		this.canvas_container = toDom(containerStructure);
 		this.$input_wrapper[0].prepend(this.canvas_container);
 
-		// Create canvas for displaying signature
-		this.display_canvas = document.createElement("canvas");
-		this.display_canvas.width = 750;
-		this.display_canvas.height = 292;
-		this.canvas_container.appendChild(this.display_canvas);
-
-		// Create overlay
-		this.overlay = document.createElement("div");
-		this.overlay.className = "signature-overlay";
-		this.canvas_container.appendChild(this.overlay);
-
-		// Create overlay text
-		this.overlay_text = document.createElement("div");
-		this.overlay_text.className = "signature-overlay-text";
-		this.overlay.appendChild(this.overlay_text);
+		// Get references via property accessors
+		// canvas_container.children[0] = canvas
+		// canvas_container.children[1] = div.signature-overlay
+		// canvas_container.children[1].children[0] = div.signature-overlay-text
+		// canvas_container.children[1].children[0].children[0] = svg (icon)
+		// canvas_container.children[1].children[0].children[1] = div (text)
+		this.display_canvas = this.canvas_container.children[0];
+		this.overlay = this.canvas_container.children[1];
+		this.overlay_text = this.overlay.children[0];
+		this.overlay_icon = this.overlay_text.children[0];
+		this.overlay_label = this.overlay_text.children[1];
 
 		// Add hover effect
 		this.canvas_container.addEventListener("mouseenter", () => {
@@ -314,16 +371,19 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		if (can_write) {
 			this.canvas_container.classList.remove("readonly");
 
+			// Update icon and label text based on current value
 			if (value) {
-				this.overlay_text.innerHTML = `
-					${frappe.utils.icon("edit", "md")}
-					<div style="margin-top: 8px;">${__("Replace signature")}</div>
-				`;
+				// Replace icon with edit icon
+				const newIcon = toDom(createIconHast("edit", "md"));
+				this.overlay_text.replaceChild(newIcon, this.overlay_icon);
+				this.overlay_icon = newIcon;
+				this.overlay_label.textContent = __("Replace signature");
 			} else {
-				this.overlay_text.innerHTML = `
-					${frappe.utils.icon("add", "md")}
-					<div style="margin-top: 8px;">${__("Add your signature")}</div>
-				`;
+				// Replace icon with add icon
+				const newIcon = toDom(createIconHast("add", "md"));
+				this.overlay_text.replaceChild(newIcon, this.overlay_icon);
+				this.overlay_icon = newIcon;
+				this.overlay_label.textContent = __("Add your signature");
 			}
 		} else {
 			this.canvas_container.classList.add("readonly");

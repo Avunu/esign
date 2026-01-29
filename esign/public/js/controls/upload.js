@@ -1,40 +1,94 @@
+import { toDom } from "hast-util-to-dom";
+
+/**
+ * @fileoverview Upload control for Frappe Framework
+ * @description This module provides a file upload control with preview functionality.
+ * Uses HAST for DOM structure creation.
+ *
+ * @requires hast-util-to-dom - For efficient DOM structure creation
+ *
+ * @author Avunu LLC
+ */
+
 export class ControlUpload extends frappe.ui.form.ControlData {
 	make_input() {
 		if (this.$input) return;
 
-		// Create hidden file input
-		this.file_input = document.createElement("input");
-		this.file_input.type = "file";
-		this.file_input.className = "hidden";
-		this.file_input.accept =
-			this.df.options?.allowed_file_types?.join(",") || "image/*";
+		// Define complete structure using hast (HTML Abstract Syntax Tree)
+		// Structure: div.upload-wrapper > [button.btn-upload, input[type=file], div.upload-preview > img]
+		const uploadStructure = {
+			type: "element",
+			tagName: "div",
+			properties: { className: ["upload-wrapper"] },
+			children: [
+				{
+					type: "element",
+					tagName: "button",
+					properties: {
+						type: "button",
+						className: [
+							"btn",
+							"btn-default",
+							"btn-sm",
+							"btn-upload",
+						],
+					},
+					children: [{ type: "text", value: __("Upload") }],
+				},
+				{
+					type: "element",
+					tagName: "input",
+					properties: {
+						type: "file",
+						className: ["hidden"],
+						accept:
+							this.df.options?.allowed_file_types?.join(",") ||
+							"image/*",
+					},
+					children: [],
+				},
+				{
+					type: "element",
+					tagName: "div",
+					properties: { className: ["upload-preview"] },
+					children: [
+						{
+							type: "element",
+							tagName: "img",
+							properties: { className: ["upload-preview-img"] },
+							children: [],
+						},
+					],
+				},
+			],
+		};
+
+		// Convert hast to DOM
+		const wrapper = toDom(uploadStructure);
+		this.input_area.appendChild(wrapper);
+
+		// Get references via property accessors
+		// wrapper.children[0] = button.btn-upload
+		// wrapper.children[1] = input[type=file]
+		// wrapper.children[2] = div.upload-preview
+		// wrapper.children[2].children[0] = img.upload-preview-img
+		const button = wrapper.children[0];
+		this.file_input = wrapper.children[1];
+		this.preview_element = wrapper.children[2];
+		this.preview_img = this.preview_element.children[0];
+
+		// Bind event listeners
 		this.file_input.addEventListener("change", (e) => {
 			this.handle_file_selection(e);
 		});
-		this.input_area.appendChild(this.file_input);
 
-		// Create upload button
-		const button = document.createElement("button");
-		button.className = "btn btn-default btn-sm btn-upload";
-		button.textContent = __("Upload");
 		button.addEventListener("click", (e) => {
 			e.preventDefault();
 			this.file_input.click();
 		});
-		this.input_area.prepend(button);
+
+		// Set references for base class compatibility
 		this.$input = $(button);
-
-		// Create preview area
-		const preview = document.createElement("div");
-		preview.className = "upload-preview";
-
-		this.preview_img = document.createElement("img");
-		this.preview_img.className = "upload-preview-img";
-		preview.appendChild(this.preview_img);
-
-		this.input_area.appendChild(preview);
-		this.preview_element = preview;
-
 		this.input = button;
 		this.has_input = true;
 		this.set_input_attributes();
