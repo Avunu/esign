@@ -514,6 +514,11 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 0.5rem;
+
+		@include media-breakpoint-down(md) {
+			bottom: auto !important;
+			top: 20px !important;
+		}
 	}
 
 	// Override toast animations for bottom-center positioning

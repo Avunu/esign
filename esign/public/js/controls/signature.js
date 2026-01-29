@@ -12,6 +12,84 @@ import { createIconHast } from "./utils";
  * @author Avunu LLC
  */
 
+/**
+ * Available signature fonts with CSS font-family values
+ * @type {Object.<string, string>}
+ */
+const SIGNATURE_FONTS = {
+	"Brush Script": '"Brush Script MT", "Brush Script Std", cursive',
+	"Lucida Handwriting": '"Lucida Handwriting", "Lucida Calligraphy", cursive',
+	"Segoe Script": '"Segoe Script", "Bradley Hand", cursive',
+	Pacifico: '"Pacifico", "Comic Sans MS", cursive',
+};
+
+/**
+ * Font name variants to check against local fonts.
+ * Maps our display label to possible PostScript/family names.
+ * @type {Object.<string, string[]>}
+ */
+const FONT_VARIANTS = {
+	"Brush Script": ["Brush Script MT", "Brush Script Std", "BrushScriptMT"],
+	"Lucida Handwriting": [
+		"Lucida Handwriting",
+		"Lucida Calligraphy",
+		"LucidaHandwriting",
+	],
+	"Segoe Script": ["Segoe Script", "SegoeScript", "Bradley Hand"],
+	Pacifico: ["Pacifico", "Pacifico-Regular"],
+};
+
+/**
+ * Gets available signature fonts using Local Font Access API.
+ * Falls back to all fonts if API unavailable or permission denied.
+ * @returns {Promise<Array<{value: string, label: string, fontFamily: string}>>}
+ */
+async function getAvailableFonts() {
+	// Check if Local Font Access API is available
+	if (!("queryLocalFonts" in window)) {
+		// Fallback: return all fonts
+		return Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
+			value: label,
+			label,
+			fontFamily,
+		}));
+	}
+
+	try {
+		const localFonts = await window.queryLocalFonts();
+		const localFontNames = new Set(
+			localFonts.map((f) => f.family.toLowerCase()),
+		);
+
+		const available = [];
+		for (const [label, fontFamily] of Object.entries(SIGNATURE_FONTS)) {
+			const variants = FONT_VARIANTS[label] || [label];
+			const isAvailable = variants.some((variant) =>
+				localFontNames.has(variant.toLowerCase()),
+			);
+			if (isAvailable) {
+				available.push({ value: label, label, fontFamily });
+			}
+		}
+
+		// Fallback: if no fonts detected, return all
+		return available.length > 0
+			? available
+			: Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
+					value: label,
+					label,
+					fontFamily,
+				}));
+	} catch {
+		// Permission denied or error - return all fonts
+		return Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
+			value: label,
+			label,
+			fontFamily,
+		}));
+	}
+}
+
 class MockForm {
 	constructor(control) {
 		this.doctype = "Signature Dialog";
@@ -159,8 +237,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		this.refresh_input();
 	}
 
-	show_signature_dialog() {
+	async show_signature_dialog() {
 		const me = this;
+
+		// Get available fonts filtered by system availability
+		const fontOptions = await getAvailableFonts();
 
 		let signature_dialog = new frappe.ui.Dialog({
 			title: __("Add your signature"),
@@ -182,10 +263,36 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					fieldname: "tab_type",
 				},
 				{
+					fieldtype: "Column Break",
+				},
+				{
 					label: __("Type Your Signature"),
 					fieldtype: "Data",
 					fieldname: "signature_typed",
 					input_class: "signature-typed-input",
+					onchange: () => {
+						me.update_typed_preview(signature_dialog);
+					},
+				},
+				{
+					fieldtype: "Column Break",
+				},
+				{
+					label: __("Font Style"),
+					fieldtype: "FontSelect",
+					fieldname: "signature_font",
+					options: fontOptions,
+					default: fontOptions[0].value,
+					onchange: () => {
+						me.update_typed_preview(signature_dialog);
+					},
+				},
+				{
+					fieldtype: "Section Break",
+				},
+				{
+					fieldtype: "HTML",
+					fieldname: "signature_typed_preview",
 				},
 				{
 					label: __("Upload"),
@@ -229,13 +336,16 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				} else if (current_tab === "tab_type") {
 					let typed_signature =
 						signature_dialog.get_value("signature_typed");
+					let selected_font =
+						signature_dialog.get_value("signature_font");
 					if (typed_signature) {
-						me.convert_typed_to_base64(typed_signature).then(
-							(base64) => {
-								me.set_signature_value(base64, "typed");
-								signature_dialog.hide();
-							},
-						);
+						me.convert_typed_to_base64(
+							typed_signature,
+							selected_font,
+						).then((base64) => {
+							me.set_signature_value(base64, "typed");
+							signature_dialog.hide();
+						});
 					} else {
 						frappe.msgprint(__("Please enter a signature text"));
 					}
@@ -263,10 +373,77 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		this.signature_dialog = signature_dialog;
 		signature_dialog.header.hide();
 		signature_dialog.show();
+
+		// Setup typed signature preview after dialog is shown
+		this.setup_typed_preview(signature_dialog);
 	}
 
-	convert_typed_to_base64(text) {
+	/**
+	 * Sets up the typed signature preview area with signature line
+	 * @param {frappe.ui.Dialog} dialog - The signature dialog instance
+	 */
+	setup_typed_preview(dialog) {
+		const preview_field = dialog.fields_dict.signature_typed_preview;
+		if (!preview_field || !preview_field.$wrapper) return;
+
+		// Define preview structure using hast
+		// Structure: div.signature-typed-preview-wrapper > [div.signature-typed-text, div.signature-line]
+		const previewStructure = {
+			type: "element",
+			tagName: "div",
+			properties: { className: ["signature-typed-preview-wrapper"] },
+			children: [
+				{
+					type: "element",
+					tagName: "div",
+					properties: { className: ["signature-typed-text"] },
+					children: [],
+				},
+				{
+					type: "element",
+					tagName: "div",
+					properties: { className: ["signature-line"] },
+					children: [],
+				},
+			],
+		};
+
+		this.typed_preview_wrapper = toDom(previewStructure);
+		// wrapper.children[0] = div.signature-typed-text
+		// wrapper.children[1] = div.signature-line
+		this.typed_preview_text = this.typed_preview_wrapper.children[0];
+		preview_field.$wrapper[0].appendChild(this.typed_preview_wrapper);
+	}
+
+	/**
+	 * Updates the typed signature preview with current input value and font
+	 * @param {frappe.ui.Dialog} dialog - The signature dialog instance
+	 */
+	update_typed_preview(dialog) {
+		if (!this.typed_preview_text) return;
+		const typed_value = dialog.get_value("signature_typed") || "";
+		const font_name =
+			dialog.get_value("signature_font") ||
+			Object.keys(SIGNATURE_FONTS)[0];
+		const font_family = SIGNATURE_FONTS[font_name];
+
+		this.typed_preview_text.textContent = typed_value;
+		this.typed_preview_text.style.fontFamily = font_family;
+	}
+
+	/**
+	 * Converts typed text to a base64 PNG image
+	 * @param {string} text - The signature text
+	 * @param {string} fontName - The font name key from SIGNATURE_FONTS
+	 * @returns {Promise<string>} Base64 encoded PNG data URL
+	 */
+	convert_typed_to_base64(text, fontName) {
 		return new Promise((resolve) => {
+			// Get font family from name, fallback to first font
+			const fontFamily =
+				SIGNATURE_FONTS[fontName] ||
+				SIGNATURE_FONTS[Object.keys(SIGNATURE_FONTS)[0]];
+
 			// Create a canvas to render the typed text
 			const canvas = document.createElement("canvas");
 			canvas.width = 750;
@@ -277,15 +454,16 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			ctx.fillStyle = "transparent";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-			// Set text properties
+			// Set text properties with selected font
 			ctx.fillStyle = "#000000";
-			ctx.font =
-				'italic 50px "Brush Script MT", "Lucida Handwriting", "Bradley Hand", "Segoe Script", "Segoe UI", cursive';
+			ctx.font = `italic 50px ${fontFamily}`;
 			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
+			ctx.textBaseline = "alphabetic";
 
-			// Draw text
-			ctx.fillText(text, canvas.width / 2, canvas.height / 2 - 10);
+			// Draw text at 3/4 from the top (1/4 from bottom)
+			// This matches the visual signature line position
+			const signatureLineY = canvas.height * 0.75;
+			ctx.fillText(text, canvas.width / 2, signatureLineY);
 
 			// Convert to base64 PNG
 			const base64 = canvas.toDataURL("image/png");

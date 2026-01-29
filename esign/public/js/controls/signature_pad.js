@@ -27,7 +27,7 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		}
 
 		// Define complete structure using hast (HTML Abstract Syntax Tree)
-		// Structure: div.signature-field > [canvas, div.signature-btn-row > a.signature-reset > svg]
+		// Structure: div.signature-field > [div.signature-canvas-wrapper > [canvas, div.signature-line], div.signature-btn-row > a.signature-reset > svg]
 		const bodyStructure = {
 			type: "element",
 			tagName: "div",
@@ -35,12 +35,25 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 			children: [
 				{
 					type: "element",
-					tagName: "canvas",
-					properties: {
-						width: 750,
-						height: 292,
-					},
-					children: [],
+					tagName: "div",
+					properties: { className: ["signature-canvas-wrapper"] },
+					children: [
+						{
+							type: "element",
+							tagName: "canvas",
+							properties: {
+								width: 750,
+								height: 292,
+							},
+							children: [],
+						},
+						{
+							type: "element",
+							tagName: "div",
+							properties: { className: ["signature-line"] },
+							children: [],
+						},
+					],
 				},
 				{
 					type: "element",
@@ -77,10 +90,14 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 		let width = this.body.offsetWidth;
 		if (width > 0 && !this.signature_pad) {
 			// Get references via property accessors
-			// body.children[0] = canvas
+			// body.children[0] = div.signature-canvas-wrapper
+			// body.children[0].children[0] = canvas
+			// body.children[0].children[1] = div.signature-line
 			// body.children[1] = div.signature-btn-row
 			// body.children[1].children[0] = a.signature-reset
-			this.canvas = this.body.children[0];
+			this.canvas_wrapper = this.body.children[0];
+			this.canvas = this.canvas_wrapper.children[0];
+			this.signature_line = this.canvas_wrapper.children[1];
 			this.reset_button_wrapper = this.body.children[1];
 			const resetButton = this.reset_button_wrapper.children[0];
 
