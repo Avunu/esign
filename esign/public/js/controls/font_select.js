@@ -1,4 +1,4 @@
-import { toDom } from "hast-util-to-dom";
+import { createIconHast, toDom } from "./utils";
 
 /**
  * @fileoverview FontSelect control for Frappe Framework

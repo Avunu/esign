@@ -1,6 +1,5 @@
 import SignaturePad from "signature_pad";
-import { toDom } from "hast-util-to-dom";
-import { createIconHast } from "./utils";
+import { createIconHast, toDom } from "./utils";
 
 /**
  * @fileoverview Signature control for Frappe Framework
@@ -9,6 +8,11 @@ import { createIconHast } from "./utils";
  * signature methods.
  *
  * Minimal dependency on Frappe - only extends the base control class pattern.
+ *
+ * Uses custom `toDom()` wrapper with string refs for element binding:
+ * - String ref: `ref: "myElement"` → assigns to `this.myElement`
+ * - Callback ref: `data: { constructor: (el) => this.arr.push(el) }` → for dynamic refs
+ * - Events: `data: { onclick: () => ... }` → assigned directly to element
  *
  * @requires signature_pad - For canvas-based signature drawing
  * @requires hast-util-to-dom - For efficient DOM structure creation
@@ -140,6 +144,22 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			type: "element",
 			tagName: "div",
 			properties: { className: ["signature-display"] },
+			ref: "display_wrapper",
+			data: {
+				onclick: () => {
+					if (this.get_status() === "Write") {
+						this.show_dialog();
+					}
+				},
+				onmouseenter: () => {
+					if (this.get_status() === "Write") {
+						this.display_overlay.classList.add("visible");
+					}
+				},
+				onmouseleave: () => {
+					this.display_overlay.classList.remove("visible");
+				},
+			},
 			children: [
 				{
 					type: "element",
@@ -149,12 +169,14 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 						height: 292,
 						className: ["signature-display-canvas"],
 					},
+					ref: "display_canvas",
 					children: [],
 				},
 				{
 					type: "element",
 					tagName: "div",
 					properties: { className: ["signature-overlay"] },
+					ref: "display_overlay",
 					children: [
 						{
 							type: "element",
@@ -163,13 +185,17 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 								className: ["signature-overlay-content"],
 							},
 							children: [
-								createIconHast("add", "md"),
+								{
+									...createIconHast("add", "md"),
+									ref: "overlay_icon",
+								},
 								{
 									type: "element",
 									tagName: "div",
 									properties: {
 										className: ["signature-overlay-text"],
 									},
+									ref: "overlay_text",
 									children: [
 										{ type: "text", value: overlayText },
 									],
@@ -181,33 +207,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			],
 		};
 
-		this.display_wrapper = toDom(displayStructure);
-		this.input_area.appendChild(this.display_wrapper);
-
-		// Get references
-		this.display_canvas = this.display_wrapper.children[0];
-		this.display_overlay = this.display_wrapper.children[1];
-		this.overlay_icon = this.display_overlay.querySelector("svg");
-		this.overlay_text = this.display_overlay.querySelector(
-			".signature-overlay-text",
-		);
-
-		// Bind click to open dialog
-		this.display_wrapper.addEventListener("click", () => {
-			if (this.get_status() === "Write") {
-				this.show_dialog();
-			}
-		});
-
-		// Hover effects
-		this.display_wrapper.addEventListener("mouseenter", () => {
-			if (this.get_status() === "Write") {
-				this.display_overlay.classList.add("visible");
-			}
-		});
-		this.display_wrapper.addEventListener("mouseleave", () => {
-			this.display_overlay.classList.remove("visible");
-		});
+		const wrapper = toDom(displayStructure, this);
+		this.input_area.appendChild(wrapper);
 	}
 
 	/**
@@ -217,9 +218,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		const term = this.get_signature_term();
 		const termLower = term.toLowerCase();
 		const popoverId = `signature-dialog-${this._id}`;
-
-		// Build font option buttons (initially empty, populated async)
 		const fontOptionsId = `signature-font-options-${this._id}`;
+
+		// Collect mode buttons and sections for array references
+		this.mode_buttons = [];
+		this.mode_sections = [];
 
 		const dialogStructure = {
 			type: "element",
@@ -228,6 +231,20 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				id: popoverId,
 				popover: "manual",
 				className: ["signature-dialog"],
+			},
+			ref: "dialog",
+			data: {
+				onclick: (e) => {
+					// Close on backdrop click
+					if (e.target === this.dialog) {
+						this.hide_dialog();
+					}
+				},
+				onkeydown: (e) => {
+					if (e.key === "Escape") {
+						this.hide_dialog();
+					}
+				},
 			},
 			children: [
 				// Header
@@ -255,6 +272,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 								className: ["signature-dialog-close"],
 								ariaLabel: __("Close"),
 							},
+							data: { onclick: () => this.hide_dialog() },
 							children: [{ type: "text", value: "×" }],
 						},
 					],
@@ -284,6 +302,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										],
 										dataMode: "draw",
 									},
+									data: {
+										constructor: (el) =>
+											this.mode_buttons.push(el),
+										onclick: () => this.select_mode("draw"),
+									},
 									children: [
 										{ type: "text", value: __("Draw") },
 									],
@@ -296,6 +319,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										className: ["signature-mode-btn"],
 										dataMode: "type",
 									},
+									data: {
+										constructor: (el) =>
+											this.mode_buttons.push(el),
+										onclick: () => this.select_mode("type"),
+									},
 									children: [
 										{ type: "text", value: __("Type") },
 									],
@@ -307,6 +335,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										type: "button",
 										className: ["signature-mode-btn"],
 										dataMode: "upload",
+									},
+									data: {
+										constructor: (el) =>
+											this.mode_buttons.push(el),
+										onclick: () =>
+											this.select_mode("upload"),
 									},
 									children: [
 										{ type: "text", value: __("Upload") },
@@ -334,6 +368,10 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										],
 										dataSection: "draw",
 									},
+									data: {
+										constructor: (el) =>
+											this.mode_sections.push(el),
+									},
 									children: [
 										{
 											type: "element",
@@ -352,6 +390,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 															"signature-pad-canvas",
 														],
 													},
+													ref: "pad_canvas",
 													children: [],
 												},
 												{
@@ -374,6 +413,13 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 												className: [
 													"signature-reset-btn",
 												],
+											},
+											data: {
+												onclick: () => {
+													if (this.signature_pad) {
+														this.signature_pad.clear();
+													}
+												},
 											},
 											children: [
 												createIconHast(
@@ -399,6 +445,10 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										],
 										dataSection: "type",
 									},
+									data: {
+										constructor: (el) =>
+											this.mode_sections.push(el),
+									},
 									children: [
 										{
 											type: "element",
@@ -421,6 +471,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 															"Type your {0}",
 															[termLower],
 														),
+													},
+													ref: "typed_input",
+													data: {
+														oninput: () =>
+															this.update_typed_preview(),
 													},
 													children: [],
 												},
@@ -459,6 +514,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																					"signature-font-value",
 																				],
 																		},
+																	ref: "font_value_display",
 																	children: [
 																		{
 																			type: "text",
@@ -496,6 +552,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																	"signature-font-popover",
 																],
 															},
+															ref: "font_popover",
 															children: [],
 														},
 													],
@@ -520,6 +577,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 															"signature-typed-text",
 														],
 													},
+													ref: "typed_preview_text",
 													children: [],
 												},
 												{
@@ -547,6 +605,10 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										],
 										dataSection: "upload",
 									},
+									data: {
+										constructor: (el) =>
+											this.mode_sections.push(el),
+									},
 									children: [
 										{
 											type: "element",
@@ -555,6 +617,46 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 												className: [
 													"signature-upload-area",
 												],
+											},
+											ref: "upload_area",
+											data: {
+												onclick: (e) => {
+													if (
+														e.target !==
+														this.file_input
+													) {
+														this.file_input.click();
+													}
+												},
+												ondragover: (e) => {
+													e.preventDefault();
+													this.upload_area.classList.add(
+														"drag-over",
+													);
+												},
+												ondragleave: () => {
+													this.upload_area.classList.remove(
+														"drag-over",
+													);
+												},
+												ondrop: (e) => {
+													e.preventDefault();
+													this.upload_area.classList.remove(
+														"drag-over",
+													);
+													const file =
+														e.dataTransfer.files[0];
+													if (
+														file &&
+														file.type.startsWith(
+															"image/",
+														)
+													) {
+														this.process_uploaded_file(
+															file,
+														);
+													}
+												},
 											},
 											children: [
 												{
@@ -567,6 +669,13 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 															"signature-file-input",
 														],
 													},
+													ref: "file_input",
+													data: {
+														onchange: (e) =>
+															this.handle_file_select(
+																e,
+															),
+													},
 													children: [],
 												},
 												{
@@ -577,6 +686,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 															"signature-upload-prompt",
 														],
 													},
+													ref: "upload_prompt",
 													children: [
 														createIconHast(
 															"upload",
@@ -605,6 +715,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 															"signature-upload-preview",
 														],
 													},
+													ref: "upload_preview",
 													children: [
 														{
 															type: "element",
@@ -614,6 +725,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																	"signature-upload-img",
 																],
 															},
+															ref: "upload_img",
 															children: [],
 														},
 													],
@@ -642,6 +754,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 									"signature-btn-secondary",
 								],
 							},
+							data: { onclick: () => this.hide_dialog() },
 							children: [{ type: "text", value: __("Cancel") }],
 						},
 						{
@@ -654,6 +767,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 									"signature-btn-primary",
 								],
 							},
+							data: { onclick: () => this.handle_insert() },
 							children: [
 								{
 									type: "text",
@@ -666,141 +780,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			],
 		};
 
-		this.dialog = toDom(dialogStructure);
+		toDom(dialogStructure, this);
 		document.body.appendChild(this.dialog);
-
-		// Get references
-		this.dialog_header = this.dialog.querySelector(
-			".signature-dialog-header",
-		);
-		this.dialog_close_btn = this.dialog.querySelector(
-			".signature-dialog-close",
-		);
-		this.mode_buttons = this.dialog.querySelectorAll(".signature-mode-btn");
-		this.mode_sections = this.dialog.querySelectorAll(".signature-section");
-
-		// Draw section refs
-		this.draw_section = this.dialog.querySelector(
-			".signature-draw-section",
-		);
-		this.pad_canvas = this.dialog.querySelector(".signature-pad-canvas");
-		this.reset_btn = this.dialog.querySelector(".signature-reset-btn");
-
-		// Type section refs
-		this.type_section = this.dialog.querySelector(
-			".signature-type-section",
-		);
-		this.typed_input = this.dialog.querySelector(".signature-typed-input");
-		this.font_trigger = this.dialog.querySelector(
-			".signature-font-trigger",
-		);
-		this.font_value_display = this.dialog.querySelector(
-			".signature-font-value",
-		);
-		this.font_popover = this.dialog.querySelector(
-			".signature-font-popover",
-		);
-		this.typed_preview_text = this.dialog.querySelector(
-			".signature-typed-text",
-		);
-
-		// Upload section refs
-		this.upload_section = this.dialog.querySelector(
-			".signature-upload-section",
-		);
-		this.file_input = this.dialog.querySelector(".signature-file-input");
-		this.upload_area = this.dialog.querySelector(".signature-upload-area");
-		this.upload_prompt = this.dialog.querySelector(
-			".signature-upload-prompt",
-		);
-		this.upload_preview = this.dialog.querySelector(
-			".signature-upload-preview",
-		);
-		this.upload_img = this.dialog.querySelector(".signature-upload-img");
-
-		// Footer refs
-		this.cancel_btn = this.dialog.querySelector(".signature-btn-secondary");
-		this.insert_btn = this.dialog.querySelector(".signature-btn-primary");
-
-		// Bind events
-		this.bind_dialog_events();
-	}
-
-	/**
-	 * Binds all event listeners for the dialog
-	 */
-	bind_dialog_events() {
-		// Close button
-		this.dialog_close_btn.addEventListener("click", () =>
-			this.hide_dialog(),
-		);
-		this.cancel_btn.addEventListener("click", () => this.hide_dialog());
-
-		// Insert button
-		this.insert_btn.addEventListener("click", () => this.handle_insert());
-
-		// Mode switching
-		this.mode_buttons.forEach((btn) => {
-			btn.addEventListener("click", () => {
-				const mode = btn.dataset.mode;
-				this.select_mode(mode);
-			});
-		});
-
-		// Draw: Reset button
-		this.reset_btn.addEventListener("click", () => {
-			if (this.signature_pad) {
-				this.signature_pad.clear();
-			}
-		});
-
-		// Type: Input changes
-		this.typed_input.addEventListener("input", () =>
-			this.update_typed_preview(),
-		);
-
-		// Upload: File selection
-		this.file_input.addEventListener("change", (e) =>
-			this.handle_file_select(e),
-		);
-
-		// Upload: Click area to trigger file input
-		this.upload_area.addEventListener("click", (e) => {
-			if (e.target !== this.file_input) {
-				this.file_input.click();
-			}
-		});
-
-		// Upload: Drag and drop
-		this.upload_area.addEventListener("dragover", (e) => {
-			e.preventDefault();
-			this.upload_area.classList.add("drag-over");
-		});
-		this.upload_area.addEventListener("dragleave", () => {
-			this.upload_area.classList.remove("drag-over");
-		});
-		this.upload_area.addEventListener("drop", (e) => {
-			e.preventDefault();
-			this.upload_area.classList.remove("drag-over");
-			const file = e.dataTransfer.files[0];
-			if (file && file.type.startsWith("image/")) {
-				this.process_uploaded_file(file);
-			}
-		});
-
-		// Close on backdrop click
-		this.dialog.addEventListener("click", (e) => {
-			if (e.target === this.dialog) {
-				this.hide_dialog();
-			}
-		});
-
-		// Close on Escape key
-		this.dialog.addEventListener("keydown", (e) => {
-			if (e.key === "Escape") {
-				this.hide_dialog();
-			}
-		});
 	}
 
 	/**
@@ -909,6 +890,9 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	 * Builds font option buttons in the font popover
 	 */
 	build_font_options() {
+		// Track font option buttons for select state updates
+		this._font_option_buttons = [];
+
 		const optionsStructure = {
 			type: "element",
 			tagName: "div",
@@ -920,7 +904,16 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					type: "button",
 					className: ["signature-font-option"],
 					dataValue: opt.value,
-					dataFontFamily: opt.fontFamily,
+				},
+				data: {
+					constructor: (el) => {
+						this._font_option_buttons.push(el);
+						el.style.fontFamily = opt.fontFamily;
+					},
+					onclick: () => {
+						this.select_font(opt.value);
+						this.font_popover.hidePopover();
+					},
 				},
 				children: [{ type: "text", value: opt.label }],
 			})),
@@ -928,15 +921,6 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 
 		const optionsEl = toDom(optionsStructure);
 		this.font_popover.appendChild(optionsEl);
-
-		// Apply font-family styles
-		optionsEl.querySelectorAll(".signature-font-option").forEach((btn) => {
-			btn.style.fontFamily = btn.dataset.fontFamily;
-			btn.addEventListener("click", () => {
-				this.select_font(btn.dataset.value);
-				this.font_popover.hidePopover();
-			});
-		});
 	}
 
 	/**
@@ -952,12 +936,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			this.font_value_display.style.fontFamily = option.fontFamily;
 		}
 
-		// Update selected state in options
-		this.font_popover
-			.querySelectorAll(".signature-font-option")
-			.forEach((btn) => {
+		// Update selected state in options using stored refs
+		if (this._font_option_buttons) {
+			this._font_option_buttons.forEach((btn) => {
 				btn.classList.toggle("selected", btn.dataset.value === value);
 			});
+		}
 
 		this.update_typed_preview();
 	}
@@ -1146,6 +1130,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	 * Renders the signature on the display canvas
 	 */
 	render_display() {
+		if (!this.display_canvas) return;
+
 		const ctx = this.display_canvas.getContext("2d");
 		ctx.clearRect(
 			0,
@@ -1249,13 +1235,21 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	}
 
 	refresh_input() {
+		// Let base class call make_input() first if needed
+		if (!this.has_input) {
+			this.make_input();
+		}
+
+		// Now safe to render
 		this.render_display();
 
 		// Update read-only state
-		if (this.get_status() !== "Write") {
-			this.display_wrapper.classList.add("readonly");
-		} else {
-			this.display_wrapper.classList.remove("readonly");
+		if (this.display_wrapper) {
+			if (this.get_status() !== "Write") {
+				this.display_wrapper.classList.add("readonly");
+			} else {
+				this.display_wrapper.classList.remove("readonly");
+			}
 		}
 	}
 }

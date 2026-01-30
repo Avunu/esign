@@ -1,3 +1,5 @@
+import { toDom as hastToDom } from "hast-util-to-dom";
+
 /**
  * @fileoverview Shared utilities for eSign controls
  * @description Provides HAST-based utilities for DOM structure creation.
@@ -6,6 +8,43 @@
  *
  * @author Avunu LLC
  */
+
+/**
+ * Converts HAST to DOM with support for element refs and event bindings.
+ *
+ * Supports ref pattern:
+ * - String ref (preferred): `ref: "myElement"` → assigns to `context.myElement`
+ *
+ * Supports constructor callback:
+ * - Callback constructor: `data: { constructor: (el) => ... }` → calls function with element
+ *
+ * Event listeners are assigned via `data` property:
+ * - `data: { onclick: (e) => ... }`
+ *
+ * @param {Object} hast - HAST structure
+ * @param {Object} [context] - Object to assign string refs to (typically `this`)
+ * @returns {Element} DOM element
+ */
+export function toDom(hast, context) {
+	return hastToDom(hast, {
+		afterTransform(node, element) {
+			// Handle string ref: assign element to context property
+			if (node.ref && typeof node.ref === "string" && context) {
+				context[node.ref] = element;
+			}
+			// Handle data properties (callback refs, events, etc.)
+			if (node.data && element instanceof Element) {
+				for (const [key, value] of Object.entries(node.data)) {
+					if (key === "constructor" && typeof value === "function") {
+						value(element); // Call ref callback with element
+					} else {
+						element[key] = value; // Assign event handlers
+					}
+				}
+			}
+		},
+	});
+}
 
 /**
  * Creates a HAST node for an SVG icon compatible with Frappe's icon system.
