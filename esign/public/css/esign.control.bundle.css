@@ -65,8 +65,8 @@
 .signature-overlay-content .es-icon use {
 	width: 24px;
 	height: 24px;
-	stroke: var(--var(--white));
-	color: var(--var(--white));
+	stroke: var(--white);
+	color: var(--white);
 }
 
 .signature-overlay-text {
@@ -392,7 +392,7 @@
 	font-style: italic;
 	color: #1a1a1a;
 	padding: 0 1rem;
-	var(--white)-space: nowrap;
+	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	pointer-events: none;
@@ -591,7 +591,7 @@
 	flex: 1;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	var(--white)-space: nowrap;
+	white-space: nowrap;
 	font-size: 18px;
 	font-style: italic;
 }
