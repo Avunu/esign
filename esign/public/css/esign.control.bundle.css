@@ -89,6 +89,9 @@
 	background: var(--fg-color);
 	box-shadow: var(--shadow-lg);
 	overflow: hidden;
+}
+
+.signature-dialog:popover-open {
 	display: flex;
 	flex-direction: column;
 }
