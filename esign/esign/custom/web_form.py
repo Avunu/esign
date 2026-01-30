@@ -126,7 +126,6 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		)
 		context.web_form_doc = web_form_doc
 		super().load_form_data(context)
-		super().add_custom_context_and_script(context)
 		super().load_translations(context)
 		super().add_metatags(context)
 		context.doctype = self.doc_type
@@ -136,6 +135,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		form_fields.add("name")
 		form_fields.add("doctype")
 		context.reference_doc = {k: v for k, v in doc.as_dict().items() if k in form_fields}
+		super().add_custom_context_and_script(context)
 
 		context.key = key  # Pass key to frontend for async API calls
 		context.printview_url = (

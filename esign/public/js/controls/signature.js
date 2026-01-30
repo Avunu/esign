@@ -362,28 +362,31 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										},
 										{
 											type: "element",
-											tagName: "button",
-											properties: {
-												type: "button",
-												className: [
-													"signature-reset-btn",
-												],
-											},
-											data: {
-												onclick: () => {
-													if (this.signature_pad) {
-														this.signature_pad.clear();
-													}
-												},
-											},
+											tagName: "div",
+											properties: { className: ["signature-btn-row"] },
 											children: [
-												createIconHast(
-													"es-line-reload",
-													"sm",
-												),
 												{
-													type: "text",
-													value: " " + __("Clear"),
+													type: "element",
+													tagName: "a",
+													properties: {
+														href: "#",
+														type: "button",
+														className: [
+															"signature-reset",
+															"btn",
+															"icon-btn",
+														],
+													},
+													data: {
+														onclick: () => {
+															if (this.signature_pad) {
+																this.signature_pad.clear();
+															}
+														},
+													},
+													children: [
+														createIconHast("es-line-reload", "sm"),
+													],
 												},
 											],
 										},
@@ -463,12 +466,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																	tagName:
 																		"span",
 																	properties:
-																		{
-																			className:
-																				[
-																					"signature-font-value",
-																				],
-																		},
+																	{
+																		className:
+																			[
+																				"signature-font-value",
+																			],
+																	},
 																	ref: "font_value_display",
 																	children: [
 																		{
@@ -482,12 +485,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																	tagName:
 																		"span",
 																	properties:
-																		{
-																			className:
-																				[
-																					"signature-font-arrow",
-																				],
-																		},
+																	{
+																		className:
+																			[
+																				"signature-font-arrow",
+																			],
+																	},
 																	children: [
 																		{
 																			type: "text",
@@ -705,6 +708,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 							properties: {
 								type: "button",
 								className: [
+									"btn",
 									"signature-btn",
 									"signature-btn-secondary",
 								],
@@ -718,6 +722,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 							properties: {
 								type: "button",
 								className: [
+									"btn",
 									"signature-btn",
 									"signature-btn-primary",
 								],

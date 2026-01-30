@@ -182,6 +182,7 @@
 
 .signature-section.active {
 	display: block;
+	position: relative;
 }
 
 /* ==========================================================================
@@ -201,6 +202,13 @@
 	width: 100%;
 	height: 200px;
 	touch-action: none;
+}
+
+.signature-pad-btn-row {
+	position: absolute;
+	top: 5px;
+	right: 5px;
+	z-index: 10;
 }
 
 .signature-reset-btn {
@@ -241,9 +249,8 @@
 .signature-typed-input {
 	flex: 1;
 	padding: 0.5rem 0.75rem;
-	font-family: 'Brush Script MT', 'Lucida Handwriting', cursive;
 	font-size: 1.25rem;
-	font-style: italic;
+	line-height: 1;
 	border: 1px solid var(--border-color);
 	border-radius: var(--border-radius);
 	background: var(--control-bg);
@@ -503,35 +510,6 @@
 	border-bottom: 2px dotted #999;
 	pointer-events: none;
 	z-index: 1;
-}
-
-/* ==========================================================================
-   SignaturePad Control (standalone field)
-   ========================================================================== */
-
-.signature-field {
-	position: relative;
-	width: 100%;
-}
-
-.signature-field .signature-canvas-wrapper {
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-	background: var(--control-bg);
-}
-
-.signature-field canvas {
-	display: block;
-	width: 100%;
-	height: auto;
-	touch-action: none;
-}
-
-.signature-btn-row {
-	position: absolute;
-	top: 5px;
-	right: 5px;
-	z-index: 10;
 }
 
 /* ==========================================================================

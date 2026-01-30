@@ -191,11 +191,9 @@ function initDocumentPreview() {
 // ============================================================================
 
 // Import and register eSign controls for web forms
-import { ControlSignaturePad } from "../controls/signature_pad";
 import { ControlUpload } from "../controls/upload";
 import { ControlSignature } from "../controls/signature";
 
-frappe.ui.form.ControlSignaturePad = ControlSignaturePad;
 frappe.ui.form.ControlUpload = ControlUpload;
 frappe.ui.form.ControlSignature = ControlSignature;
 
