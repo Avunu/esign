@@ -323,18 +323,22 @@ def attach_print_to_document(
 	pdf_hash = hashlib.sha256(pdf_content).hexdigest()
 
 	# Attach the signed PDF to the document
-	file_doc = frappe.get_doc(
-		{
-			"doctype": "File",
-			"file_name": print_data["fname"],
-			"attached_to_doctype": doc.doctype,
-			"attached_to_name": doc.name,
-			"folder": "Home/Attachments",
-			"is_private": True,
-			"content": pdf_content,
-		}
+	file_doc = cast(
+		File,
+		frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": print_data["fname"],
+				"attached_to_doctype": doc.doctype,
+				"attached_to_name": doc.name,
+				"folder": "Home/Attachments",
+				"is_private": True,
+				"content": pdf_content,
+			}
+		),
 	)
 	file_doc.save(ignore_permissions=True)
+	file_doc.write_file()
 
 	# Create Communication record for timeline display with audit data as JSON
 	audit_content = json.dumps(
@@ -809,6 +813,7 @@ def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 		deduplicate=True,
 		timeout=300,
 		doc=doc,
+		enqueue_after_commit=True,
 		print_format=print_format,
 		request_data=request_data,
 		audit_data=audit_data,
