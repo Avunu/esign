@@ -58,32 +58,34 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 							properties: { className: ["signature-line"] },
 							children: [],
 						},
-					],
-				},
-				{
-					type: "element",
-					tagName: "div",
-					properties: { className: ["signature-btn-row"] },
-					children: [
 						{
 							type: "element",
-							tagName: "a",
-							properties: {
-								href: "#",
-								type: "button",
-								className: [
-									"signature-reset",
-									"btn",
-									"icon-btn",
-								],
-							},
-							data: {
-								onclick: (e) => {
-									e.preventDefault();
-									this.on_reset_sign();
+							tagName: "div",
+							properties: { className: ["signature-btn-row"] },
+							children: [
+								{
+									type: "element",
+									tagName: "a",
+									properties: {
+										href: "#",
+										type: "button",
+										className: [
+											"signature-reset",
+											"btn",
+											"icon-btn",
+										],
+									},
+									data: {
+										onclick: (e) => {
+											e.preventDefault();
+											this.on_reset_sign();
+										},
+									},
+									children: [
+										createIconHast("es-line-reload", "sm"),
+									],
 								},
-							},
-							children: [createIconHast("es-line-reload", "sm")],
+							],
 						},
 					],
 				},

@@ -22,6 +22,11 @@
 {%- block navbar -%}{%- endblock -%}
 {%- block footer -%}{%- endblock -%}
 
+<!-- include icons -->
+{% include "public/icons/timeless/icons.svg" %}
+{% include "public/icons/espresso/icons.svg" %}
+
+
 {% block content %}
 <div class="esign-layout {{ 'esign-completed' if is_completed else '' }} {{ 'esign-force-mobile' if force_mobile else '' }}">
 	<!-- Header -->
