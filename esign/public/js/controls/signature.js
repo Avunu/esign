@@ -93,7 +93,10 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	 */
 	build_display_area() {
 		const term = this.get_signature_term().toLowerCase();
-		const overlayText = __("Add your {0}", [term]);
+		const addText = __("Add your {0}", [term]);
+		const replaceText = __("Replace {0}", [term]);
+		const addIcon = createIconHast("es-line-add", "md");
+		const replaceIcon = createIconHast("es-line-edit", "md");
 
 		const displayStructure = {
 			type: "element",
@@ -105,14 +108,6 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					if (this.get_status() === "Write") {
 						this.show_dialog();
 					}
-				},
-				onmouseenter: () => {
-					if (this.get_status() === "Write") {
-						this.display_overlay.classList.add("visible");
-					}
-				},
-				onmouseleave: () => {
-					this.display_overlay.classList.remove("visible");
 				},
 			},
 			children: [
@@ -137,12 +132,14 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 							type: "element",
 							tagName: "div",
 							properties: {
-								className: ["signature-overlay-content"],
+								className: [
+									"signature-overlay-content",
+									"add-signature",
+								],
 							},
 							children: [
 								{
-									...createIconHast("add", "md"),
-									ref: "overlay_icon",
+									...addIcon,
 								},
 								{
 									type: "element",
@@ -150,9 +147,33 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 									properties: {
 										className: ["signature-overlay-text"],
 									},
-									ref: "overlay_text",
 									children: [
-										{ type: "text", value: overlayText },
+										{ type: "text", value: addText },
+									],
+								},
+							],
+						},
+						{
+							type: "element",
+							tagName: "div",
+							properties: {
+								className: [
+									"signature-overlay-content",
+									"replace-signature",
+								],
+							},
+							children: [
+								{
+									...replaceIcon,
+								},
+								{
+									type: "element",
+									tagName: "div",
+									properties: {
+										className: ["signature-overlay-text"],
+									},
+									children: [
+										{ type: "text", value: replaceText },
 									],
 								},
 							],
@@ -363,7 +384,11 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 										{
 											type: "element",
 											tagName: "div",
-											properties: { className: ["signature-btn-row"] },
+											properties: {
+												className: [
+													"signature-btn-row",
+												],
+											},
 											children: [
 												{
 													type: "element",
@@ -379,13 +404,19 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 													},
 													data: {
 														onclick: () => {
-															if (this.signature_pad) {
+															if (
+																this
+																	.signature_pad
+															) {
 																this.signature_pad.clear();
 															}
 														},
 													},
 													children: [
-														createIconHast("es-line-reload", "sm"),
+														createIconHast(
+															"es-line-reload",
+															"sm",
+														),
 													],
 												},
 											],
@@ -466,12 +497,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																	tagName:
 																		"span",
 																	properties:
-																	{
-																		className:
-																			[
-																				"signature-font-value",
-																			],
-																	},
+																		{
+																			className:
+																				[
+																					"signature-font-value",
+																				],
+																		},
 																	ref: "font_value_display",
 																	children: [
 																		{
@@ -485,12 +516,12 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 																	tagName:
 																		"span",
 																	properties:
-																	{
-																		className:
-																			[
-																				"signature-font-arrow",
-																			],
-																	},
+																		{
+																			className:
+																				[
+																					"signature-font-arrow",
+																				],
+																		},
 																	children: [
 																		{
 																			type: "text",
@@ -1110,11 +1141,9 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			};
 			img.src = value;
 			this.display_wrapper.classList.add("has-signature");
-			this.update_overlay_for_replace();
 		} else {
 			this.render_empty_display();
 			this.display_wrapper.classList.remove("has-signature");
-			this.update_overlay_for_add();
 		}
 	}
 
@@ -1140,28 +1169,6 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			this.display_canvas.height - 20,
 		);
 		ctx.setLineDash([]);
-	}
-
-	/**
-	 * Updates overlay text for "Add" state
-	 */
-	update_overlay_for_add() {
-		const term = this.get_signature_term().toLowerCase();
-		const newIcon = toDom(createIconHast("add", "md"));
-		this.overlay_icon.replaceWith(newIcon);
-		this.overlay_icon = newIcon;
-		this.overlay_text.textContent = __("Add your {0}", [term]);
-	}
-
-	/**
-	 * Updates overlay text for "Replace" state
-	 */
-	update_overlay_for_replace() {
-		const term = this.get_signature_term().toLowerCase();
-		const newIcon = toDom(createIconHast("edit", "md"));
-		this.overlay_icon.replaceWith(newIcon);
-		this.overlay_icon = newIcon;
-		this.overlay_text.textContent = __("Replace {0}", [term]);
 	}
 
 	// ─────────────────────────────────────────────────────────────────
