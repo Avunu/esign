@@ -88,7 +88,7 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 
 	make_pad() {
 		let width = this.body.offsetWidth;
-		if (width > 0 && !this.signature_pad) {
+		if (width > 0) {
 			// Get references via property accessors
 			// body.children[0] = div.signature-canvas-wrapper
 			// body.children[0].children[0] = canvas
@@ -99,30 +99,58 @@ export class ControlSignaturePad extends frappe.ui.form.ControlData {
 			this.canvas = this.canvas_wrapper.children[0];
 			this.signature_line = this.canvas_wrapper.children[1];
 			this.reset_button_wrapper = this.body.children[1];
-			const resetButton = this.reset_button_wrapper.children[0];
 
-			// Initialize signature_pad with options
-			this.signature_pad = new SignaturePad(this.canvas, {
-				backgroundColor: "transparent",
-				penColor: "black",
-			});
+			// Resize canvas to match CSS size and device pixel ratio
+			this.resize_canvas();
 
-			// Handle signature changes
-			this.signature_pad.addEventListener("endStroke", () => {
-				this.on_save_sign();
-			});
+			if (!this.signature_pad) {
+				// Initialize signature_pad with options
+				this.signature_pad = new SignaturePad(this.canvas, {
+					backgroundColor: "transparent",
+					penColor: "black",
+				});
 
-			// Handle reset button click
-			this.reset_button_wrapper.addEventListener("click", (e) => {
-				if (e.target.closest(".signature-reset")) {
-					e.preventDefault();
-					this.on_reset_sign();
-					return false;
-				}
-			});
+				// Handle signature changes
+				this.signature_pad.addEventListener("endStroke", () => {
+					this.on_save_sign();
+				});
 
-			this.load_pad();
-			this.refresh_input();
+				// Handle reset button click
+				this.reset_button_wrapper.addEventListener("click", (e) => {
+					if (e.target.closest(".signature-reset")) {
+						e.preventDefault();
+						this.on_reset_sign();
+						return false;
+					}
+				});
+
+				this.load_pad();
+				this.refresh_input();
+			}
+		}
+	}
+
+	/**
+	 * Resize the canvas to match its CSS-rendered size and account for device pixel ratio.
+	 * This is required for signature_pad to work correctly when the canvas is scaled via CSS.
+	 */
+	resize_canvas() {
+		const ratio = Math.max(window.devicePixelRatio || 1, 1);
+		const rect = this.canvas.getBoundingClientRect();
+
+		// Only resize if dimensions have changed
+		if (
+			this.canvas.width !== rect.width * ratio ||
+			this.canvas.height !== rect.height * ratio
+		) {
+			this.canvas.width = rect.width * ratio;
+			this.canvas.height = rect.height * ratio;
+			this.canvas.getContext("2d").scale(ratio, ratio);
+
+			// If signature_pad already exists, clear it (resize invalidates content)
+			if (this.signature_pad) {
+				this.signature_pad.clear();
+			}
 		}
 	}
 

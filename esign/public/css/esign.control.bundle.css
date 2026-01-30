@@ -1,11 +1,570 @@
 /* ==========================================================================
-   FontSelect Control - Custom font picker with Popover API
+   eSign Controls - Modern CSS with Popover API & CSS Anchor Positioning
+   ========================================================================== */
+
+/* ==========================================================================
+   Signature Display Area
+   ========================================================================== */
+
+.signature-display {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 750 / 292;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--control-bg);
+	cursor: pointer;
+	overflow: hidden;
+}
+
+.signature-display.readonly {
+	cursor: default;
+}
+
+.signature-display.has-signature {
+	border-style: solid;
+}
+
+.signature-display-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+/* Signature Overlay */
+.signature-overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.7);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	pointer-events: none;
+}
+
+.signature-overlay.visible {
+	opacity: 1;
+}
+
+.signature-display.readonly .signature-overlay {
+	display: none;
+}
+
+.signature-overlay-content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	color: white;
+}
+
+.signature-overlay-content .icon,
+.signature-overlay-content .es-icon {
+	width: 24px;
+	height: 24px;
+	stroke: white;
+}
+
+.signature-overlay-text {
+	font-size: 1rem;
+	font-weight: 500;
+}
+
+/* ==========================================================================
+   Signature Dialog (Popover-based)
+   ========================================================================== */
+
+.signature-dialog {
+	position: fixed;
+	inset: 0;
+	margin: auto;
+	width: min(90vw, 700px);
+	max-height: 90vh;
+	padding: 0;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	background: var(--fg-color);
+	box-shadow: var(--shadow-lg);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.signature-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.5);
+}
+
+/* Dialog Header */
+.signature-dialog-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.25rem;
+	border-bottom: 1px solid var(--border-color);
+}
+
+.signature-dialog-header h3 {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+
+.signature-dialog-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	padding: 0;
+	font-size: 1.5rem;
+	line-height: 1;
+	color: var(--text-muted);
+	background: none;
+	border: none;
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: background-color 0.15s, color 0.15s;
+}
+
+.signature-dialog-close:hover {
+	background: var(--bg-light-gray);
+	color: var(--text-color);
+}
+
+/* Dialog Body */
+.signature-dialog-body {
+	flex: 1;
+	padding: 1.25rem;
+	overflow-y: auto;
+}
+
+/* Mode Buttons */
+.signature-mode-buttons {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1.25rem;
+}
+
+.signature-mode-btn {
+	flex: 1;
+	padding: 0.75rem 1rem;
+	font-size: 1rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	background: var(--control-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.signature-mode-btn:hover {
+	background: var(--bg-light-gray);
+	color: var(--text-color);
+}
+
+.signature-mode-btn.active {
+	color: white;
+	background: var(--primary);
+	border-color: var(--primary);
+}
+
+/* Mode Sections */
+.signature-section {
+	display: none;
+}
+
+.signature-section.active {
+	display: block;
+}
+
+/* ==========================================================================
+   Draw Section
+   ========================================================================== */
+
+.signature-draw-section .signature-canvas-wrapper {
+	position: relative;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--control-bg);
+	overflow: hidden;
+}
+
+.signature-pad-canvas {
+	display: block;
+	width: 100%;
+	height: 200px;
+	touch-action: none;
+}
+
+.signature-reset-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	margin-top: 0.75rem;
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+	background: none;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.signature-reset-btn:hover {
+	background: var(--bg-light-gray);
+	color: var(--text-color);
+}
+
+.signature-reset-btn .es-icon {
+	width: 14px;
+	height: 14px;
+}
+
+/* ==========================================================================
+   Type Section
+   ========================================================================== */
+
+.signature-type-inputs {
+	display: flex;
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+
+.signature-typed-input {
+	flex: 1;
+	padding: 0.5rem 0.75rem;
+	font-family: 'Brush Script MT', 'Lucida Handwriting', cursive;
+	font-size: 1.25rem;
+	font-style: italic;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--control-bg);
+}
+
+.signature-typed-input:focus {
+	outline: none;
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+/* Font Selector */
+.signature-font-select {
+	position: relative;
+	min-width: 150px;
+	anchor-name: --font-anchor;
+}
+
+.signature-font-trigger {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	padding: 0.5rem 0.75rem;
+	font-size: 1rem;
+	background: var(--control-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: border-color 0.15s;
+}
+
+.signature-font-trigger:hover {
+	border-color: var(--gray-500);
+}
+
+.signature-font-value {
+	font-style: italic;
+	font-size: 1.125rem;
+}
+
+.signature-font-arrow {
+	margin-left: 0.5rem;
+	font-size: 0.625rem;
+	color: var(--text-muted);
+}
+
+.signature-font-popover {
+	margin: 0;
+	padding: 0.25rem;
+	min-width: 180px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--fg-color);
+	box-shadow: var(--shadow-md);
+
+	/* CSS Anchor Positioning */
+	position: absolute;
+	top: anchor(--font-anchor bottom);
+	left: anchor(--font-anchor left);
+	margin-top: 4px;
+}
+
+.signature-font-popover::backdrop {
+	background: transparent;
+}
+
+/* Fallback for browsers without anchor positioning */
+@supports not (top: anchor(--font-anchor bottom)) {
+	.signature-font-popover {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		margin-top: 4px;
+	}
+}
+
+.signature-font-options {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.signature-font-option {
+	display: block;
+	width: 100%;
+	padding: 0.5rem 0.75rem;
+	font-size: 1.25rem;
+	font-style: italic;
+	text-align: left;
+	background: transparent;
+	border: none;
+	border-radius: calc(var(--border-radius) - 2px);
+	cursor: pointer;
+	transition: background-color 0.1s;
+}
+
+.signature-font-option:hover {
+	background: var(--bg-light-gray);
+}
+
+.signature-font-option.selected {
+	background: var(--primary-light);
+	color: var(--primary);
+}
+
+/* Typed Preview */
+.signature-typed-preview {
+	position: relative;
+	height: 150px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--control-bg);
+	overflow: hidden;
+}
+
+.signature-typed-preview .signature-typed-text {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 75%;
+	transform: translateY(-100%);
+	text-align: center;
+	font-family: 'Brush Script MT', cursive;
+	font-size: 3rem;
+	font-style: italic;
+	color: #1a1a1a;
+	padding: 0 1rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	pointer-events: none;
+}
+
+/* ==========================================================================
+   Upload Section
+   ========================================================================== */
+
+.signature-upload-area {
+	position: relative;
+	min-height: 200px;
+	border: 2px dashed var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--control-bg);
+	cursor: pointer;
+	transition: border-color 0.15s, background-color 0.15s;
+}
+
+.signature-upload-area:hover,
+.signature-upload-area.drag-over {
+	border-color: var(--primary);
+	background: var(--primary-light);
+}
+
+.signature-file-input {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.signature-upload-prompt {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	padding: 2rem;
+	text-align: center;
+	color: var(--text-muted);
+	pointer-events: none;
+}
+
+.signature-upload-prompt.hidden {
+	display: none;
+}
+
+.signature-upload-prompt .icon,
+.signature-upload-prompt .es-icon {
+	width: 48px;
+	height: 48px;
+	stroke: var(--text-muted);
+}
+
+.signature-upload-preview {
+	display: none;
+	padding: 1rem;
+}
+
+.signature-upload-preview.active {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.signature-upload-img {
+	max-width: 100%;
+	max-height: 180px;
+	border-radius: var(--border-radius);
+}
+
+/* ==========================================================================
+   Dialog Footer
+   ========================================================================== */
+
+.signature-dialog-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	padding: 1rem 1.25rem;
+	border-top: 1px solid var(--border-color);
+	background: var(--bg-color);
+}
+
+.signature-btn {
+	padding: 0.5rem 1.25rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.signature-btn-secondary {
+	color: var(--text-color);
+	background: var(--control-bg);
+	border: 1px solid var(--border-color);
+}
+
+.signature-btn-secondary:hover {
+	background: var(--bg-light-gray);
+}
+
+.signature-btn-primary {
+	color: white;
+	background: var(--primary);
+	border: 1px solid var(--primary);
+}
+
+.signature-btn-primary:hover {
+	background: var(--primary-dark);
+	border-color: var(--primary-dark);
+}
+
+/* ==========================================================================
+   Signature Line (shared)
+   ========================================================================== */
+
+.signature-line {
+	position: absolute;
+	left: 10%;
+	right: 10%;
+	top: 75%;
+	height: 0;
+	border-bottom: 2px dotted #999;
+	pointer-events: none;
+	z-index: 1;
+}
+
+/* ==========================================================================
+   SignaturePad Control (standalone field)
+   ========================================================================== */
+
+.signature-field {
+	position: relative;
+	width: 100%;
+}
+
+.signature-field .signature-canvas-wrapper {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+	background: var(--control-bg);
+}
+
+.signature-field canvas {
+	display: block;
+	width: 100%;
+	height: auto;
+	touch-action: none;
+}
+
+.signature-btn-row {
+	position: absolute;
+	top: 5px;
+	right: 5px;
+	z-index: 10;
+}
+
+/* ==========================================================================
+   Upload Control (standalone)
+   ========================================================================== */
+
+.upload-wrapper {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.upload-preview {
+	display: none;
+}
+
+.upload-preview.active {
+	display: block;
+}
+
+.upload-preview-img {
+	max-width: 100%;
+	max-height: 200px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius);
+}
+
+/* ==========================================================================
+   FontSelect Control (standalone)
    ========================================================================== */
 
 .font-select-wrapper {
 	position: relative;
 	display: inline-block;
 	width: 100%;
+	anchor-name: --font-select-anchor;
 }
 
 .font-select-trigger {
@@ -49,7 +608,6 @@
 	color: var(--text-muted);
 }
 
-/* Popover dropdown with CSS Anchor Positioning */
 .font-select-popover {
 	margin: 0;
 	padding: 4px;
@@ -63,18 +621,16 @@
 
 	/* CSS Anchor Positioning */
 	position: absolute;
-	top: anchor(bottom);
-	left: anchor(left);
+	top: anchor(--font-select-anchor bottom);
+	left: anchor(--font-select-anchor left);
 	margin-top: 4px;
-
-	/* Popover base styles */
-	&::backdrop {
-		background: transparent;
-	}
 }
 
-/* Fallback for browsers without anchor positioning */
-@supports not (top: anchor(bottom)) {
+.font-select-popover::backdrop {
+	background: transparent;
+}
+
+@supports not (top: anchor(--font-select-anchor bottom)) {
 	.font-select-popover {
 		position: absolute;
 		top: 100%;
@@ -115,249 +671,4 @@
 .font-select-option.selected {
 	background: var(--primary-light);
 	color: var(--primary);
-}
-
-.font-select-option.selected:hover {
-	background: var(--primary-light);
-}
-
-/* ==========================================================================
-   Signature Controls
-   ========================================================================== */
-
-/* Cursive styling for typed signatures */
-.signature-typed-input {
-	font-family: 'Brush Script MT', 'Lucida Handwriting', 'Bradley Hand',
-		'Segoe Script', 'Segoe UI', cursive !important;
-	font-size: 24px !important;
-	font-style: italic;
-	font-weight: 400;
-	letter-spacing: 0.5px;
-	color: #1a1a1a;
-}
-
-/* Typed Signature Preview Wrapper */
-.signature-typed-preview-wrapper {
-	position: relative;
-	width: 100%;
-	height: 200px;
-	margin-top: 1rem;
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-	background: var(--control-bg);
-	overflow: hidden;
-}
-
-/* Typed Signature Preview Text */
-.signature-typed-text {
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 75%;
-	transform: translateY(-100%);
-	text-align: center;
-	/* font-family is set dynamically via JS based on font selection */
-	font-family: 'Brush Script MT', cursive;
-	font-size: 50px;
-	font-style: italic;
-	font-weight: 400;
-	letter-spacing: 0.5px;
-	color: #1a1a1a;
-	padding: 0 2rem;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	pointer-events: none;
-}
-
-/* Signature Canvas Container */
-.signature-canvas-container {
-	aspect-ratio: 5 / 2;
-	position: relative;
-	width: 100%;
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-	background: var(--control-bg);
-	cursor: pointer;
-	overflow: hidden;
-}
-
-/* Signature Canvas Wrapper (for SignaturePad with line overlay) */
-.signature-canvas-wrapper {
-	position: relative;
-	width: 100%;
-}
-
-/* Signature Line - visual guide at 1/4 from bottom (75% from top) */
-.signature-line {
-	position: absolute;
-	left: 10%;
-	right: 10%;
-	top: 75%;
-	height: 0;
-	border-bottom: 2px dotted #999;
-	pointer-events: none;
-	z-index: 1;
-}
-
-.signature-canvas-container.readonly {
-	cursor: default;
-}
-
-.signature-canvas-container canvas {
-	display: block;
-	width: 100%;
-	height: auto;
-}
-
-/* Signature Overlay */
-.signature-overlay {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	background: rgba(0, 0, 0, 0.7);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	opacity: 0;
-	transition: opacity 0.2s ease;
-	pointer-events: none;
-}
-
-.signature-overlay-text {
-	color: white;
-	font-size: 18px;
-	font-weight: 500;
-	text-align: center;
-	padding: 20px;
-}
-
-.signature-overlay .icon {
-	stroke: white;
-}
-
-/* Signature Pad Field */
-.signature-pad-field,
-.signature-field {
-	position: relative;
-	width: 100%;
-	min-height: 292px;
-}
-
-.signature-pad-wrapper {
-	position: relative;
-	width: 100%;
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-	background: var(--control-bg);
-}
-
-.signature-pad-wrapper canvas {
-	display: block;
-	width: 100%;
-	touch-action: none;
-}
-
-/* Signature Button Row */
-.signature-btn-row {
-	position: absolute;
-	top: 5px;
-	right: 5px;
-	z-index: 10;
-}
-
-/* Upload Control */
-.upload-preview {
-	margin-top: 10px;
-	display: none;
-}
-
-.upload-preview.active {
-	display: block;
-}
-
-.upload-preview-img {
-	max-width: 100%;
-	max-height: 292px;
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-}
-
-/* Form tabs styling for signature dialog */
-.modal .form-tabs-list {
-	margin-bottom: 1rem;
-	border-bottom: 1px solid #d1d8dd;
-}
-
-.modal .form-tabs {
-	display: flex;
-	flex-wrap: wrap;
-	padding-left: 0;
-	margin-bottom: 0;
-	list-style: none;
-	border-bottom: none;
-	overflow-y: clip;
-}
-
-.modal .form-tabs .nav-item {
-	margin-bottom: -1px;
-}
-
-.modal .form-tabs .nav-link {
-	display: block;
-	padding: 0.5rem 1rem;
-	color: #6c757d;
-	text-decoration: none;
-	background-color: transparent;
-	border: 1px solid transparent;
-	border-top-left-radius: 0.25rem;
-	border-top-right-radius: 0.25rem;
-	transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-	cursor: pointer;
-}
-
-.modal .form-tabs .nav-link:hover,
-.modal .form-tabs .nav-link:focus {
-	color: #495057;
-	background-color: #f8f9fa;
-	border-color: transparent;
-}
-
-.modal .form-tabs .nav-link.active {
-	color: #495057;
-	background-color: #fff;
-	border-color: #d1d8dd #d1d8dd #fff;
-	font-weight: 600;
-}
-
-.modal .form-tab-content {
-	padding-top: 0.25rem;
-}
-
-.modal .tab-pane {
-	display: none;
-}
-
-.modal .tab-pane.active.show {
-	display: block;
-}
-
-/* Hide default details tab */
-.modal .form-tabs .nav-item.hide {
-	display: none !important;
-}
-
-/* Ensure form sections display properly in tabs */
-.modal .form-section {
-	margin-bottom: 0;
-}
-
-.modal .form-section.visible-section {
-	display: block;
-}
-
-.modal .form-section.empty-section {
-	display: none;
 }

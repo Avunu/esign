@@ -1,12 +1,16 @@
+import SignaturePad from "signature_pad";
 import { toDom } from "hast-util-to-dom";
 import { createIconHast } from "./utils";
 
 /**
  * @fileoverview Signature control for Frappe Framework
- * @description This module provides a signature control that displays signatures
- * and opens a dialog for drawing, typing, or uploading signatures.
- * Uses HAST for DOM structure creation.
+ * @description A modern, self-contained signature control using HAST for DOM creation,
+ * Popover API for dialogs, and CSS Anchor Positioning. Supports draw, type, and upload
+ * signature methods.
  *
+ * Minimal dependency on Frappe - only extends the base control class pattern.
+ *
+ * @requires signature_pad - For canvas-based signature drawing
  * @requires hast-util-to-dom - For efficient DOM structure creation
  *
  * @author Avunu LLC
@@ -40,14 +44,17 @@ const FONT_VARIANTS = {
 };
 
 /**
+ * Unique ID counter for popover associations
+ */
+let signatureCounter = 0;
+
+/**
  * Gets available signature fonts using Local Font Access API.
  * Falls back to all fonts if API unavailable or permission denied.
  * @returns {Promise<Array<{value: string, label: string, fontFamily: string}>>}
  */
 async function getAvailableFonts() {
-	// Check if Local Font Access API is available
 	if (!("queryLocalFonts" in window)) {
-		// Fallback: return all fonts
 		return Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
 			value: label,
 			label,
@@ -72,7 +79,6 @@ async function getAvailableFonts() {
 			}
 		}
 
-		// Fallback: if no fonts detected, return all
 		return available.length > 0
 			? available
 			: Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
@@ -81,7 +87,6 @@ async function getAvailableFonts() {
 					fontFamily,
 				}));
 	} catch {
-		// Permission denied or error - return all fonts
 		return Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
 			value: label,
 			label,
@@ -90,51 +95,12 @@ async function getAvailableFonts() {
 	}
 }
 
-class MockForm {
-	constructor(control) {
-		this.doctype = "Signature Dialog";
-		this.name = "Signature Dialog";
-		this.doc = { docstatus: 0 };
-		this.control = control;
-		this.meta = {
-			make_attachments_public: false,
-		};
-	}
-
-	get_perm(permlevel, ptype) {
-		return true;
-	}
-
-	save() {
-		return true;
-	}
-
-	set_active_tab(active_tab) {
-		const previousTabId = `signature-dialog-${this.active_tab?.df?.fieldname}`;
-		const activeTabId = `signature-dialog-${active_tab?.df?.fieldname}`;
-
-		// Get tab content elements
-		const previousTabContent =
-			this.active_tab?.tabs_content?.[0]?.querySelector(
-				`#${previousTabId}`,
-			);
-		const activeTabContent =
-			this.active_tab?.tabs_content?.[0]?.querySelector(
-				`#${activeTabId}`,
-			);
-
-		// Set new active tab
-		this.active_tab = active_tab;
-
-		if (activeTabContent) {
-			activeTabContent.classList.add("active", "show");
-		}
-		if (previousTabContent) {
-			previousTabContent.classList.remove("active", "show");
-		}
-	}
-}
-
+/**
+ * @class ControlSignature
+ * @extends frappe.ui.form.ControlData
+ * @description A signature field control with draw, type, and upload modes.
+ * Uses modern web APIs (Popover, CSS Anchor Positioning) and HAST for DOM.
+ */
 export class ControlSignature extends frappe.ui.form.ControlData {
 	/**
 	 * Gets the term to use for "signature" from df.options.
@@ -145,32 +111,35 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		return this.df.options?.trim() || "Signature";
 	}
 
-	make() {
-		super.make();
+	make_input() {
+		if (this.has_input) return;
 
-		// Store reference to label element (created by parent)
-		if (this.df.label && this.label_area) {
-			this.label_area.textContent = __(
-				this.df.label,
-				null,
-				this.df.parent,
-			);
-		}
+		this._id = ++signatureCounter;
+		this._current_mode = "draw";
+		this._font_options = [];
+		this._selected_font = null;
 
-		// make a pointer to value
-		this.value = this.get_value();
+		// Build the display area and popover dialog
+		this.build_display_area();
+		this.build_dialog_popover();
 
-		// Get the overlay text with the correct term
-		const overlayText = __("Add your {0}", [
-			this.get_signature_term().toLowerCase(),
-		]);
+		// Set references for base class compatibility
+		this.$input = $(this.display_canvas);
+		this.input = this.display_canvas;
+		this.has_input = true;
+	}
 
-		// Define structure using hast (HTML Abstract Syntax Tree)
-		// Structure: div.signature-canvas-container > [canvas, div.signature-overlay > div.signature-overlay-text > [svg, div]]
-		const containerStructure = {
+	/**
+	 * Builds the signature display area with canvas and overlay
+	 */
+	build_display_area() {
+		const term = this.get_signature_term().toLowerCase();
+		const overlayText = __("Add your {0}", [term]);
+
+		const displayStructure = {
 			type: "element",
 			tagName: "div",
-			properties: { className: ["signature-canvas-container"] },
+			properties: { className: ["signature-display"] },
 			children: [
 				{
 					type: "element",
@@ -191,19 +160,18 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 							type: "element",
 							tagName: "div",
 							properties: {
-								className: ["signature-overlay-text"],
+								className: ["signature-overlay-content"],
 							},
 							children: [
 								createIconHast("add", "md"),
 								{
 									type: "element",
 									tagName: "div",
-									properties: { style: "margin-top: 8px;" },
+									properties: {
+										className: ["signature-overlay-text"],
+									},
 									children: [
-										{
-											type: "text",
-											value: overlayText,
-										},
+										{ type: "text", value: overlayText },
 									],
 								},
 							],
@@ -213,306 +181,923 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			],
 		};
 
-		// Convert hast to DOM and prepend to wrapper
-		this.canvas_container = toDom(containerStructure);
-		this.$input_wrapper[0].prepend(this.canvas_container);
+		this.display_wrapper = toDom(displayStructure);
+		this.input_area.appendChild(this.display_wrapper);
 
-		// Get references via property accessors
-		// canvas_container.children[0] = canvas
-		// canvas_container.children[1] = div.signature-overlay
-		// canvas_container.children[1].children[0] = div.signature-overlay-text
-		// canvas_container.children[1].children[0].children[0] = svg (icon)
-		// canvas_container.children[1].children[0].children[1] = div (text)
-		this.display_canvas = this.canvas_container.children[0];
-		this.overlay = this.canvas_container.children[1];
-		this.overlay_text = this.overlay.children[0];
-		this.overlay_icon = this.overlay_text.children[0];
-		this.overlay_label = this.overlay_text.children[1];
+		// Get references
+		this.display_canvas = this.display_wrapper.children[0];
+		this.display_overlay = this.display_wrapper.children[1];
+		this.overlay_icon = this.display_overlay.querySelector("svg");
+		this.overlay_text = this.display_overlay.querySelector(
+			".signature-overlay-text",
+		);
 
-		// Add hover effect
-		this.canvas_container.addEventListener("mouseenter", () => {
+		// Bind click to open dialog
+		this.display_wrapper.addEventListener("click", () => {
 			if (this.get_status() === "Write") {
-				this.overlay.style.opacity = "1";
+				this.show_dialog();
 			}
 		});
 
-		this.canvas_container.addEventListener("mouseleave", () => {
-			this.overlay.style.opacity = "0";
-		});
-
-		// Add click handler
-		this.canvas_container.addEventListener("click", (e) => {
+		// Hover effects
+		this.display_wrapper.addEventListener("mouseenter", () => {
 			if (this.get_status() === "Write") {
-				e.preventDefault();
-				this.show_signature_dialog();
+				this.display_overlay.classList.add("visible");
 			}
 		});
-
-		this.refresh_input();
-	}
-
-	async show_signature_dialog() {
-		const me = this;
-
-		// Get available fonts filtered by system availability
-		const fontOptions = await getAvailableFonts();
-
-		// Get the term to use (e.g., "Signature" or "Initials")
-		const term = this.get_signature_term();
-		const termLower = term.toLowerCase();
-
-		let signature_dialog = new frappe.ui.Dialog({
-			title: __("Add your {0}", [termLower]),
-			fields: [
-				{
-					label: __("Draw"),
-					fieldtype: "Tab Break",
-					fieldname: "tab_draw",
-					active: true,
-				},
-				{
-					label: __("Draw Your {0}", [term]),
-					fieldtype: "SignaturePad",
-					fieldname: "signature_draw",
-				},
-				{
-					label: __("Type"),
-					fieldtype: "Tab Break",
-					fieldname: "tab_type",
-				},
-				{
-					fieldtype: "Column Break",
-				},
-				{
-					label: __("Type Your {0}", [term]),
-					fieldtype: "Data",
-					fieldname: "signature_typed",
-					input_class: "signature-typed-input",
-					onchange: () => {
-						me.update_typed_preview(signature_dialog);
-					},
-				},
-				{
-					fieldtype: "Column Break",
-				},
-				{
-					label: __("Font Style"),
-					fieldtype: "FontSelect",
-					fieldname: "signature_font",
-					options: fontOptions,
-					default: fontOptions[0].value,
-					onchange: () => {
-						me.update_typed_preview(signature_dialog);
-					},
-				},
-				{
-					fieldtype: "Section Break",
-				},
-				{
-					fieldtype: "HTML",
-					fieldname: "signature_typed_preview",
-				},
-				{
-					label: __("Upload"),
-					fieldtype: "Tab Break",
-					fieldname: "tab_upload",
-				},
-				{
-					label: __("Upload Your {0}", [term]),
-					fieldtype: "Upload",
-					fieldname: "signature_upload",
-					options: {
-						allowed_file_types: ["image/*"],
-					},
-				},
-			],
-			frm: new MockForm(this),
-			size: "large",
-			primary_action_label: __("Insert {0}", [term]),
-			primary_action: function () {
-				const current_tab =
-					signature_dialog.frm.active_tab?.df.fieldname || null;
-
-				if (current_tab === "tab_draw") {
-					const signature_field =
-						signature_dialog.fields_dict.signature_draw;
-					let signature_data;
-
-					if (signature_field && signature_field.signature_pad) {
-						if (!signature_field.signature_pad.isEmpty()) {
-							signature_data =
-								signature_field.canvas.toDataURL("image/png");
-						}
-					}
-
-					if (signature_data) {
-						me.set_signature_value(signature_data, "draw");
-						signature_dialog.hide();
-					} else {
-						frappe.msgprint(
-							__("Please draw a {0} first", [termLower]),
-						);
-					}
-				} else if (current_tab === "tab_type") {
-					let typed_signature =
-						signature_dialog.get_value("signature_typed");
-					let selected_font =
-						signature_dialog.get_value("signature_font");
-					if (typed_signature) {
-						me.convert_typed_to_base64(
-							typed_signature,
-							selected_font,
-						).then((base64) => {
-							me.set_signature_value(base64, "typed");
-							signature_dialog.hide();
-						});
-					} else {
-						frappe.msgprint(
-							__("Please enter {0} text", [termLower]),
-						);
-					}
-				} else if (current_tab === "tab_upload") {
-					let uploaded_signature =
-						signature_dialog.get_value("signature_upload");
-					if (uploaded_signature) {
-						me.map_upload_to_canvas(uploaded_signature).then(
-							(base64) => {
-								me.set_signature_value(base64, "upload");
-								signature_dialog.hide();
-							},
-						);
-					} else {
-						frappe.msgprint(
-							__("Please upload a {0} image", [termLower]),
-						);
-					}
-				} else {
-					frappe.msgprint(
-						__("Please select a method to add your {0}", [
-							termLower,
-						]),
-					);
-				}
-			},
+		this.display_wrapper.addEventListener("mouseleave", () => {
+			this.display_overlay.classList.remove("visible");
 		});
-
-		this.signature_dialog = signature_dialog;
-		signature_dialog.header.hide();
-		signature_dialog.show();
-
-		// Setup typed signature preview after dialog is shown
-		this.setup_typed_preview(signature_dialog);
 	}
 
 	/**
-	 * Sets up the typed signature preview area with signature line
-	 * @param {frappe.ui.Dialog} dialog - The signature dialog instance
+	 * Builds the signature dialog as a popover element
 	 */
-	setup_typed_preview(dialog) {
-		const preview_field = dialog.fields_dict.signature_typed_preview;
-		if (!preview_field || !preview_field.$wrapper) return;
+	build_dialog_popover() {
+		const term = this.get_signature_term();
+		const termLower = term.toLowerCase();
+		const popoverId = `signature-dialog-${this._id}`;
 
-		// Define preview structure using hast
-		// Structure: div.signature-typed-preview-wrapper > [div.signature-typed-text, div.signature-line]
-		const previewStructure = {
+		// Build font option buttons (initially empty, populated async)
+		const fontOptionsId = `signature-font-options-${this._id}`;
+
+		const dialogStructure = {
 			type: "element",
 			tagName: "div",
-			properties: { className: ["signature-typed-preview-wrapper"] },
+			properties: {
+				id: popoverId,
+				popover: "manual",
+				className: ["signature-dialog"],
+			},
 			children: [
+				// Header
 				{
 					type: "element",
 					tagName: "div",
-					properties: { className: ["signature-typed-text"] },
-					children: [],
+					properties: { className: ["signature-dialog-header"] },
+					children: [
+						{
+							type: "element",
+							tagName: "h3",
+							properties: {},
+							children: [
+								{
+									type: "text",
+									value: __("Add your {0}", [termLower]),
+								},
+							],
+						},
+						{
+							type: "element",
+							tagName: "button",
+							properties: {
+								type: "button",
+								className: ["signature-dialog-close"],
+								ariaLabel: __("Close"),
+							},
+							children: [{ type: "text", value: "×" }],
+						},
+					],
 				},
+				// Body
 				{
 					type: "element",
 					tagName: "div",
-					properties: { className: ["signature-line"] },
-					children: [],
+					properties: { className: ["signature-dialog-body"] },
+					children: [
+						// Mode buttons
+						{
+							type: "element",
+							tagName: "div",
+							properties: {
+								className: ["signature-mode-buttons"],
+							},
+							children: [
+								{
+									type: "element",
+									tagName: "button",
+									properties: {
+										type: "button",
+										className: [
+											"signature-mode-btn",
+											"active",
+										],
+										dataMode: "draw",
+									},
+									children: [
+										{ type: "text", value: __("Draw") },
+									],
+								},
+								{
+									type: "element",
+									tagName: "button",
+									properties: {
+										type: "button",
+										className: ["signature-mode-btn"],
+										dataMode: "type",
+									},
+									children: [
+										{ type: "text", value: __("Type") },
+									],
+								},
+								{
+									type: "element",
+									tagName: "button",
+									properties: {
+										type: "button",
+										className: ["signature-mode-btn"],
+										dataMode: "upload",
+									},
+									children: [
+										{ type: "text", value: __("Upload") },
+									],
+								},
+							],
+						},
+						// Mode sections container
+						{
+							type: "element",
+							tagName: "div",
+							properties: {
+								className: ["signature-mode-sections"],
+							},
+							children: [
+								// Draw section
+								{
+									type: "element",
+									tagName: "div",
+									properties: {
+										className: [
+											"signature-section",
+											"signature-draw-section",
+											"active",
+										],
+										dataSection: "draw",
+									},
+									children: [
+										{
+											type: "element",
+											tagName: "div",
+											properties: {
+												className: [
+													"signature-canvas-wrapper",
+												],
+											},
+											children: [
+												{
+													type: "element",
+													tagName: "canvas",
+													properties: {
+														className: [
+															"signature-pad-canvas",
+														],
+													},
+													children: [],
+												},
+												{
+													type: "element",
+													tagName: "div",
+													properties: {
+														className: [
+															"signature-line",
+														],
+													},
+													children: [],
+												},
+											],
+										},
+										{
+											type: "element",
+											tagName: "button",
+											properties: {
+												type: "button",
+												className: [
+													"signature-reset-btn",
+												],
+											},
+											children: [
+												createIconHast(
+													"es-line-reload",
+													"sm",
+												),
+												{
+													type: "text",
+													value: " " + __("Clear"),
+												},
+											],
+										},
+									],
+								},
+								// Type section
+								{
+									type: "element",
+									tagName: "div",
+									properties: {
+										className: [
+											"signature-section",
+											"signature-type-section",
+										],
+										dataSection: "type",
+									},
+									children: [
+										{
+											type: "element",
+											tagName: "div",
+											properties: {
+												className: [
+													"signature-type-inputs",
+												],
+											},
+											children: [
+												{
+													type: "element",
+													tagName: "input",
+													properties: {
+														type: "text",
+														className: [
+															"signature-typed-input",
+														],
+														placeholder: __(
+															"Type your {0}",
+															[termLower],
+														),
+													},
+													children: [],
+												},
+												// Font selector
+												{
+													type: "element",
+													tagName: "div",
+													properties: {
+														className: [
+															"signature-font-select",
+														],
+													},
+													children: [
+														{
+															type: "element",
+															tagName: "button",
+															properties: {
+																type: "button",
+																className: [
+																	"signature-font-trigger",
+																],
+																popoverTarget:
+																	fontOptionsId,
+																popoverTargetAction:
+																	"toggle",
+															},
+															children: [
+																{
+																	type: "element",
+																	tagName:
+																		"span",
+																	properties:
+																		{
+																			className:
+																				[
+																					"signature-font-value",
+																				],
+																		},
+																	children: [
+																		{
+																			type: "text",
+																			value: "",
+																		},
+																	],
+																},
+																{
+																	type: "element",
+																	tagName:
+																		"span",
+																	properties:
+																		{
+																			className:
+																				[
+																					"signature-font-arrow",
+																				],
+																		},
+																	children: [
+																		{
+																			type: "text",
+																			value: "▾",
+																		},
+																	],
+																},
+															],
+														},
+														{
+															type: "element",
+															tagName: "div",
+															properties: {
+																id: fontOptionsId,
+																popover: "auto",
+																className: [
+																	"signature-font-popover",
+																],
+															},
+															children: [],
+														},
+													],
+												},
+											],
+										},
+										// Typed preview
+										{
+											type: "element",
+											tagName: "div",
+											properties: {
+												className: [
+													"signature-typed-preview",
+												],
+											},
+											children: [
+												{
+													type: "element",
+													tagName: "div",
+													properties: {
+														className: [
+															"signature-typed-text",
+														],
+													},
+													children: [],
+												},
+												{
+													type: "element",
+													tagName: "div",
+													properties: {
+														className: [
+															"signature-line",
+														],
+													},
+													children: [],
+												},
+											],
+										},
+									],
+								},
+								// Upload section
+								{
+									type: "element",
+									tagName: "div",
+									properties: {
+										className: [
+											"signature-section",
+											"signature-upload-section",
+										],
+										dataSection: "upload",
+									},
+									children: [
+										{
+											type: "element",
+											tagName: "div",
+											properties: {
+												className: [
+													"signature-upload-area",
+												],
+											},
+											children: [
+												{
+													type: "element",
+													tagName: "input",
+													properties: {
+														type: "file",
+														accept: "image/*",
+														className: [
+															"signature-file-input",
+														],
+													},
+													children: [],
+												},
+												{
+													type: "element",
+													tagName: "div",
+													properties: {
+														className: [
+															"signature-upload-prompt",
+														],
+													},
+													children: [
+														createIconHast(
+															"upload",
+															"lg",
+														),
+														{
+															type: "element",
+															tagName: "div",
+															properties: {},
+															children: [
+																{
+																	type: "text",
+																	value: __(
+																		"Click or drag to upload",
+																	),
+																},
+															],
+														},
+													],
+												},
+												{
+													type: "element",
+													tagName: "div",
+													properties: {
+														className: [
+															"signature-upload-preview",
+														],
+													},
+													children: [
+														{
+															type: "element",
+															tagName: "img",
+															properties: {
+																className: [
+																	"signature-upload-img",
+																],
+															},
+															children: [],
+														},
+													],
+												},
+											],
+										},
+									],
+								},
+							],
+						},
+					],
+				},
+				// Footer
+				{
+					type: "element",
+					tagName: "div",
+					properties: { className: ["signature-dialog-footer"] },
+					children: [
+						{
+							type: "element",
+							tagName: "button",
+							properties: {
+								type: "button",
+								className: [
+									"signature-btn",
+									"signature-btn-secondary",
+								],
+							},
+							children: [{ type: "text", value: __("Cancel") }],
+						},
+						{
+							type: "element",
+							tagName: "button",
+							properties: {
+								type: "button",
+								className: [
+									"signature-btn",
+									"signature-btn-primary",
+								],
+							},
+							children: [
+								{
+									type: "text",
+									value: __("Insert {0}", [term]),
+								},
+							],
+						},
+					],
 				},
 			],
 		};
 
-		this.typed_preview_wrapper = toDom(previewStructure);
-		// wrapper.children[0] = div.signature-typed-text
-		// wrapper.children[1] = div.signature-line
-		this.typed_preview_text = this.typed_preview_wrapper.children[0];
-		preview_field.$wrapper[0].appendChild(this.typed_preview_wrapper);
+		this.dialog = toDom(dialogStructure);
+		document.body.appendChild(this.dialog);
+
+		// Get references
+		this.dialog_header = this.dialog.querySelector(
+			".signature-dialog-header",
+		);
+		this.dialog_close_btn = this.dialog.querySelector(
+			".signature-dialog-close",
+		);
+		this.mode_buttons = this.dialog.querySelectorAll(".signature-mode-btn");
+		this.mode_sections = this.dialog.querySelectorAll(".signature-section");
+
+		// Draw section refs
+		this.draw_section = this.dialog.querySelector(
+			".signature-draw-section",
+		);
+		this.pad_canvas = this.dialog.querySelector(".signature-pad-canvas");
+		this.reset_btn = this.dialog.querySelector(".signature-reset-btn");
+
+		// Type section refs
+		this.type_section = this.dialog.querySelector(
+			".signature-type-section",
+		);
+		this.typed_input = this.dialog.querySelector(".signature-typed-input");
+		this.font_trigger = this.dialog.querySelector(
+			".signature-font-trigger",
+		);
+		this.font_value_display = this.dialog.querySelector(
+			".signature-font-value",
+		);
+		this.font_popover = this.dialog.querySelector(
+			".signature-font-popover",
+		);
+		this.typed_preview_text = this.dialog.querySelector(
+			".signature-typed-text",
+		);
+
+		// Upload section refs
+		this.upload_section = this.dialog.querySelector(
+			".signature-upload-section",
+		);
+		this.file_input = this.dialog.querySelector(".signature-file-input");
+		this.upload_area = this.dialog.querySelector(".signature-upload-area");
+		this.upload_prompt = this.dialog.querySelector(
+			".signature-upload-prompt",
+		);
+		this.upload_preview = this.dialog.querySelector(
+			".signature-upload-preview",
+		);
+		this.upload_img = this.dialog.querySelector(".signature-upload-img");
+
+		// Footer refs
+		this.cancel_btn = this.dialog.querySelector(".signature-btn-secondary");
+		this.insert_btn = this.dialog.querySelector(".signature-btn-primary");
+
+		// Bind events
+		this.bind_dialog_events();
 	}
 
 	/**
-	 * Updates the typed signature preview with current input value and font
-	 * @param {frappe.ui.Dialog} dialog - The signature dialog instance
+	 * Binds all event listeners for the dialog
 	 */
-	update_typed_preview(dialog) {
-		if (!this.typed_preview_text) return;
-		const typed_value = dialog.get_value("signature_typed") || "";
-		const font_name =
-			dialog.get_value("signature_font") ||
-			Object.keys(SIGNATURE_FONTS)[0];
-		const font_family = SIGNATURE_FONTS[font_name];
+	bind_dialog_events() {
+		// Close button
+		this.dialog_close_btn.addEventListener("click", () =>
+			this.hide_dialog(),
+		);
+		this.cancel_btn.addEventListener("click", () => this.hide_dialog());
 
-		this.typed_preview_text.textContent = typed_value;
-		this.typed_preview_text.style.fontFamily = font_family;
-	}
+		// Insert button
+		this.insert_btn.addEventListener("click", () => this.handle_insert());
 
-	/**
-	 * Converts typed text to a base64 PNG image
-	 * @param {string} text - The signature text
-	 * @param {string} fontName - The font name key from SIGNATURE_FONTS
-	 * @returns {Promise<string>} Base64 encoded PNG data URL
-	 */
-	convert_typed_to_base64(text, fontName) {
-		return new Promise((resolve) => {
-			// Get font family from name, fallback to first font
-			const fontFamily =
-				SIGNATURE_FONTS[fontName] ||
-				SIGNATURE_FONTS[Object.keys(SIGNATURE_FONTS)[0]];
+		// Mode switching
+		this.mode_buttons.forEach((btn) => {
+			btn.addEventListener("click", () => {
+				const mode = btn.dataset.mode;
+				this.select_mode(mode);
+			});
+		});
 
-			// Create a canvas to render the typed text
-			const canvas = document.createElement("canvas");
-			canvas.width = 750;
-			canvas.height = 292;
-			const ctx = canvas.getContext("2d");
+		// Draw: Reset button
+		this.reset_btn.addEventListener("click", () => {
+			if (this.signature_pad) {
+				this.signature_pad.clear();
+			}
+		});
 
-			// Set background to transparency
-			ctx.fillStyle = "transparent";
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
+		// Type: Input changes
+		this.typed_input.addEventListener("input", () =>
+			this.update_typed_preview(),
+		);
 
-			// Set text properties with selected font
-			ctx.fillStyle = "#000000";
-			ctx.font = `italic 50px ${fontFamily}`;
-			ctx.textAlign = "center";
-			ctx.textBaseline = "alphabetic";
+		// Upload: File selection
+		this.file_input.addEventListener("change", (e) =>
+			this.handle_file_select(e),
+		);
 
-			// Draw text at 3/4 from the top (1/4 from bottom)
-			// This matches the visual signature line position
-			const signatureLineY = canvas.height * 0.75;
-			ctx.fillText(text, canvas.width / 2, signatureLineY);
+		// Upload: Click area to trigger file input
+		this.upload_area.addEventListener("click", (e) => {
+			if (e.target !== this.file_input) {
+				this.file_input.click();
+			}
+		});
 
-			// Convert to base64 PNG
-			const base64 = canvas.toDataURL("image/png");
-			resolve(base64);
+		// Upload: Drag and drop
+		this.upload_area.addEventListener("dragover", (e) => {
+			e.preventDefault();
+			this.upload_area.classList.add("drag-over");
+		});
+		this.upload_area.addEventListener("dragleave", () => {
+			this.upload_area.classList.remove("drag-over");
+		});
+		this.upload_area.addEventListener("drop", (e) => {
+			e.preventDefault();
+			this.upload_area.classList.remove("drag-over");
+			const file = e.dataTransfer.files[0];
+			if (file && file.type.startsWith("image/")) {
+				this.process_uploaded_file(file);
+			}
+		});
+
+		// Close on backdrop click
+		this.dialog.addEventListener("click", (e) => {
+			if (e.target === this.dialog) {
+				this.hide_dialog();
+			}
+		});
+
+		// Close on Escape key
+		this.dialog.addEventListener("keydown", (e) => {
+			if (e.key === "Escape") {
+				this.hide_dialog();
+			}
 		});
 	}
 
-	map_upload_to_canvas(dataUrl) {
+	/**
+	 * Shows the signature dialog
+	 */
+	async show_dialog() {
+		// Load fonts if not already loaded
+		if (this._font_options.length === 0) {
+			this._font_options = await getAvailableFonts();
+			this.build_font_options();
+			if (this._font_options.length > 0) {
+				this.select_font(this._font_options[0].value);
+			}
+		}
+
+		// Reset state
+		this._upload_data = null;
+		this.upload_preview.classList.remove("active");
+		this.upload_prompt.classList.remove("hidden");
+		this.typed_input.value = "";
+		this.update_typed_preview();
+
+		// Show dialog
+		this.dialog.showPopover();
+
+		// Initialize signature pad after dialog is visible
+		requestAnimationFrame(() => {
+			this.init_signature_pad();
+		});
+	}
+
+	/**
+	 * Hides the signature dialog
+	 */
+	hide_dialog() {
+		this.dialog.hidePopover();
+	}
+
+	/**
+	 * Selects a signature mode (draw, type, upload)
+	 * @param {string} mode - The mode to select
+	 */
+	select_mode(mode) {
+		this._current_mode = mode;
+
+		// Update button states
+		this.mode_buttons.forEach((btn) => {
+			btn.classList.toggle("active", btn.dataset.mode === mode);
+		});
+
+		// Update section visibility
+		this.mode_sections.forEach((section) => {
+			section.classList.toggle(
+				"active",
+				section.dataset.section === mode,
+			);
+		});
+
+		// Initialize signature pad when switching to draw mode
+		if (mode === "draw") {
+			requestAnimationFrame(() => this.init_signature_pad());
+		}
+	}
+
+	/**
+	 * Initializes the signature pad on the draw canvas
+	 */
+	init_signature_pad() {
+		if (!this.pad_canvas) return;
+
+		// Resize canvas to match CSS size
+		this.resize_pad_canvas();
+
+		if (!this.signature_pad) {
+			this.signature_pad = new SignaturePad(this.pad_canvas, {
+				backgroundColor: "transparent",
+				penColor: "black",
+			});
+		}
+	}
+
+	/**
+	 * Resizes the pad canvas to match CSS dimensions and device pixel ratio
+	 */
+	resize_pad_canvas() {
+		const ratio = Math.max(window.devicePixelRatio || 1, 1);
+		const rect = this.pad_canvas.getBoundingClientRect();
+
+		if (rect.width === 0 || rect.height === 0) return;
+
+		if (
+			this.pad_canvas.width !== rect.width * ratio ||
+			this.pad_canvas.height !== rect.height * ratio
+		) {
+			this.pad_canvas.width = rect.width * ratio;
+			this.pad_canvas.height = rect.height * ratio;
+			this.pad_canvas.getContext("2d").scale(ratio, ratio);
+
+			if (this.signature_pad) {
+				this.signature_pad.clear();
+			}
+		}
+	}
+
+	/**
+	 * Builds font option buttons in the font popover
+	 */
+	build_font_options() {
+		const optionsStructure = {
+			type: "element",
+			tagName: "div",
+			properties: { className: ["signature-font-options"] },
+			children: this._font_options.map((opt) => ({
+				type: "element",
+				tagName: "button",
+				properties: {
+					type: "button",
+					className: ["signature-font-option"],
+					dataValue: opt.value,
+					dataFontFamily: opt.fontFamily,
+				},
+				children: [{ type: "text", value: opt.label }],
+			})),
+		};
+
+		const optionsEl = toDom(optionsStructure);
+		this.font_popover.appendChild(optionsEl);
+
+		// Apply font-family styles
+		optionsEl.querySelectorAll(".signature-font-option").forEach((btn) => {
+			btn.style.fontFamily = btn.dataset.fontFamily;
+			btn.addEventListener("click", () => {
+				this.select_font(btn.dataset.value);
+				this.font_popover.hidePopover();
+			});
+		});
+	}
+
+	/**
+	 * Selects a font for typed signatures
+	 * @param {string} value - The font value to select
+	 */
+	select_font(value) {
+		this._selected_font = value;
+		const option = this._font_options.find((o) => o.value === value);
+
+		if (option) {
+			this.font_value_display.textContent = option.label;
+			this.font_value_display.style.fontFamily = option.fontFamily;
+		}
+
+		// Update selected state in options
+		this.font_popover
+			.querySelectorAll(".signature-font-option")
+			.forEach((btn) => {
+				btn.classList.toggle("selected", btn.dataset.value === value);
+			});
+
+		this.update_typed_preview();
+	}
+
+	/**
+	 * Updates the typed signature preview
+	 */
+	update_typed_preview() {
+		const text = this.typed_input.value || "";
+		const option = this._font_options.find(
+			(o) => o.value === this._selected_font,
+		);
+		const fontFamily =
+			option?.fontFamily ||
+			SIGNATURE_FONTS[Object.keys(SIGNATURE_FONTS)[0]];
+
+		this.typed_preview_text.textContent = text;
+		this.typed_preview_text.style.fontFamily = fontFamily;
+	}
+
+	/**
+	 * Handles file selection from input
+	 * @param {Event} e - The change event
+	 */
+	handle_file_select(e) {
+		const file = e.target.files[0];
+		if (file) {
+			this.process_uploaded_file(file);
+		}
+	}
+
+	/**
+	 * Processes an uploaded file and shows preview
+	 * @param {File} file - The uploaded file
+	 */
+	process_uploaded_file(file) {
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			this._upload_data = e.target.result;
+			this.upload_img.src = this._upload_data;
+			this.upload_preview.classList.add("active");
+			this.upload_prompt.classList.add("hidden");
+		};
+		reader.readAsDataURL(file);
+	}
+
+	/**
+	 * Handles the insert button click
+	 */
+	handle_insert() {
+		const term = this.get_signature_term().toLowerCase();
+
+		if (this._current_mode === "draw") {
+			if (!this.signature_pad || this.signature_pad.isEmpty()) {
+				frappe.toast({
+					message: __("Please draw a {0} first", [term]),
+					indicator: "orange",
+				});
+				return;
+			}
+			const data = this.pad_canvas.toDataURL("image/png");
+			this.set_signature_value(data);
+		} else if (this._current_mode === "type") {
+			const text = this.typed_input.value.trim();
+			if (!text) {
+				frappe.toast({
+					message: __("Please enter {0} text", [term]),
+					indicator: "orange",
+				});
+				return;
+			}
+			const data = this.convert_typed_to_base64(text);
+			this.set_signature_value(data);
+		} else if (this._current_mode === "upload") {
+			if (!this._upload_data) {
+				frappe.toast({
+					message: __("Please upload a {0} image", [term]),
+					indicator: "orange",
+				});
+				return;
+			}
+			this.normalize_upload_to_canvas(this._upload_data).then((data) => {
+				this.set_signature_value(data);
+			});
+			return; // Don't hide yet, wait for promise
+		}
+
+		this.hide_dialog();
+	}
+
+	/**
+	 * Converts typed text to base64 PNG
+	 * @param {string} text - The text to convert
+	 * @returns {string} Base64 data URL
+	 */
+	convert_typed_to_base64(text) {
+		const option = this._font_options.find(
+			(o) => o.value === this._selected_font,
+		);
+		const fontFamily =
+			option?.fontFamily ||
+			SIGNATURE_FONTS[Object.keys(SIGNATURE_FONTS)[0]];
+
+		const canvas = document.createElement("canvas");
+		canvas.width = 750;
+		canvas.height = 292;
+		const ctx = canvas.getContext("2d");
+
+		ctx.fillStyle = "transparent";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+		ctx.fillStyle = "#000000";
+		ctx.font = `italic 50px ${fontFamily}`;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "alphabetic";
+
+		// Draw text at 75% from top (on the signature line)
+		const signatureLineY = canvas.height * 0.75;
+		ctx.fillText(text, canvas.width / 2, signatureLineY);
+
+		return canvas.toDataURL("image/png");
+	}
+
+	/**
+	 * Normalizes an uploaded image to a consistent canvas size
+	 * @param {string} dataUrl - The uploaded image data URL
+	 * @returns {Promise<string>} Normalized base64 data URL
+	 */
+	normalize_upload_to_canvas(dataUrl) {
 		return new Promise((resolve, reject) => {
-			// Create canvas with consistent dimensions (same as typed signature)
 			const canvas = document.createElement("canvas");
 			canvas.width = 750;
 			canvas.height = 292;
 			const ctx = canvas.getContext("2d");
 
-			// Set transparent background
 			ctx.fillStyle = "transparent";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-			// Load the uploaded image
 			const img = new Image();
-			img.onload = function () {
-				// Calculate scaling to fit within canvas while maintaining aspect ratio
+			img.onload = () => {
 				const padding = 20;
 				const maxWidth = canvas.width - padding * 2;
 				const maxHeight = canvas.height - padding * 2;
@@ -521,7 +1106,6 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				let height = img.height;
 				const aspectRatio = width / height;
 
-				// Scale to fit within bounds
 				if (width > maxWidth) {
 					width = maxWidth;
 					height = width / aspectRatio;
@@ -531,81 +1115,38 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 					width = height * aspectRatio;
 				}
 
-				// Center the image on canvas
 				const x = (canvas.width - width) / 2;
 				const y = (canvas.height - height) / 2;
 
-				// Draw the image centered and scaled
 				ctx.drawImage(img, x, y, width, height);
-
-				// Convert to base64 PNG
-				const base64 = canvas.toDataURL("image/png");
-				resolve(base64);
+				resolve(canvas.toDataURL("image/png"));
 			};
 			img.onerror = reject;
 			img.src = dataUrl;
 		});
 	}
 
-	set_signature_value(base64_data, method) {
-		this.set_value(base64_data);
-		this.value = base64_data;
-		this.refresh_input();
+	/**
+	 * Sets the signature value and updates the display
+	 * @param {string} data - Base64 signature data
+	 */
+	set_signature_value(data) {
+		this.value = data;
+		this.set_value(data);
+		this.render_display();
+		this.hide_dialog();
+
 		frappe.toast({
-			message: __("Signature added successfully"),
+			message: __("{0} added successfully", [this.get_signature_term()]),
 			indicator: "green",
 		});
 	}
 
-	refresh_input() {
-		if (!this.canvas_container) return;
-
-		// Hide the actual input field (created by parent ControlData)
-		if (this.input_area) {
-			this.input_area.style.display = "none";
-		}
-
-		const value = this.get_value();
-		const can_write = this.get_status() === "Write";
-
-		// Update canvas display
-		this.render_signature(value);
-
-		// Update overlay text and interaction
-		if (can_write) {
-			this.canvas_container.classList.remove("readonly");
-			const termLower = this.get_signature_term().toLowerCase();
-
-			// Update icon and label text based on current value
-			if (value) {
-				// Replace icon with edit icon
-				const newIcon = toDom(createIconHast("edit", "md"));
-				this.overlay_text.replaceChild(newIcon, this.overlay_icon);
-				this.overlay_icon = newIcon;
-				this.overlay_label.textContent = __("Replace {0}", [termLower]);
-			} else {
-				// Replace icon with add icon
-				const newIcon = toDom(createIconHast("add", "md"));
-				this.overlay_text.replaceChild(newIcon, this.overlay_icon);
-				this.overlay_icon = newIcon;
-				this.overlay_label.textContent = __("Add your {0}", [
-					termLower,
-				]);
-			}
-		} else {
-			this.canvas_container.classList.add("readonly");
-			this.overlay.style.opacity = "0";
-		}
-
-		if (this.get_status() === "Read" && this.disp_area) {
-			this.disp_area.style.display = "none";
-		}
-	}
-
-	render_signature(value) {
+	/**
+	 * Renders the signature on the display canvas
+	 */
+	render_display() {
 		const ctx = this.display_canvas.getContext("2d");
-
-		// Clear canvas
 		ctx.clearRect(
 			0,
 			0,
@@ -613,8 +1154,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 			this.display_canvas.height,
 		);
 
+		const value = this.get_value();
 		if (value) {
-			// Load and draw signature
 			const img = new Image();
 			img.onload = () => {
 				ctx.drawImage(
@@ -626,26 +1167,95 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 				);
 			};
 			img.src = value;
+			this.display_wrapper.classList.add("has-signature");
+			this.update_overlay_for_replace();
 		} else {
-			// Draw empty state with dashed border
-			ctx.setLineDash([5, 5]);
-			ctx.strokeStyle = "var(--border-color)";
-			ctx.lineWidth = 2;
-			ctx.strokeRect(
-				10,
-				10,
-				this.display_canvas.width - 20,
-				this.display_canvas.height - 20,
-			);
-			ctx.setLineDash([]);
+			this.render_empty_display();
+			this.display_wrapper.classList.remove("has-signature");
+			this.update_overlay_for_add();
 		}
+	}
+
+	/**
+	 * Renders the empty state on the display canvas
+	 */
+	render_empty_display() {
+		const ctx = this.display_canvas.getContext("2d");
+		ctx.clearRect(
+			0,
+			0,
+			this.display_canvas.width,
+			this.display_canvas.height,
+		);
+
+		ctx.setLineDash([5, 5]);
+		ctx.strokeStyle = "var(--border-color)";
+		ctx.lineWidth = 2;
+		ctx.strokeRect(
+			10,
+			10,
+			this.display_canvas.width - 20,
+			this.display_canvas.height - 20,
+		);
+		ctx.setLineDash([]);
+	}
+
+	/**
+	 * Updates overlay text for "Add" state
+	 */
+	update_overlay_for_add() {
+		const term = this.get_signature_term().toLowerCase();
+		const newIcon = toDom(createIconHast("add", "md"));
+		this.overlay_icon.replaceWith(newIcon);
+		this.overlay_icon = newIcon;
+		this.overlay_text.textContent = __("Add your {0}", [term]);
+	}
+
+	/**
+	 * Updates overlay text for "Replace" state
+	 */
+	update_overlay_for_replace() {
+		const term = this.get_signature_term().toLowerCase();
+		const newIcon = toDom(createIconHast("edit", "md"));
+		this.overlay_icon.replaceWith(newIcon);
+		this.overlay_icon = newIcon;
+		this.overlay_text.textContent = __("Replace {0}", [term]);
+	}
+
+	// ─────────────────────────────────────────────────────────────────
+	// Base class interface methods
+	// ─────────────────────────────────────────────────────────────────
+
+	set_input(value) {
+		this.value = value;
+		this.render_display();
+	}
+
+	get_input_value() {
+		return this.value;
 	}
 
 	get_value() {
 		const value = this.value || this.get_model_value();
-		if (value == "/assets/frappe/images/signature-placeholder.png") {
+		// Ignore placeholder image
+		if (value === "/assets/frappe/images/signature-placeholder.png") {
 			return "";
 		}
 		return value;
+	}
+
+	set_formatted_input(value) {
+		this.set_input(value);
+	}
+
+	refresh_input() {
+		this.render_display();
+
+		// Update read-only state
+		if (this.get_status() !== "Write") {
+			this.display_wrapper.classList.add("readonly");
+		} else {
+			this.display_wrapper.classList.remove("readonly");
+		}
 	}
 }
