@@ -14,6 +14,8 @@ import { createIconHast, toDom } from "./utils";
  * - Callback ref: `data: { constructor: (el) => this.arr.push(el) }` → for dynamic refs
  * - Events: `data: { onclick: () => ... }` → assigned directly to element
  *
+ * Fonts are bundled via @fontsource and imported in the controls index.js entry point.
+ *
  * @requires signature_pad - For canvas-based signature drawing
  * @requires hast-util-to-dom - For efficient DOM structure creation
  *
@@ -21,83 +23,36 @@ import { createIconHast, toDom } from "./utils";
  */
 
 /**
- * Available signature fonts with CSS font-family values
- * @type {Object.<string, string>}
+ * Bundled signature fonts from @fontsource - always available
+ * @type {Array<{value: string, label: string, fontFamily: string}>}
  */
-const SIGNATURE_FONTS = {
-	"Brush Script": '"Brush Script MT", "Brush Script Std", cursive',
-	"Lucida Handwriting": '"Lucida Handwriting", "Lucida Calligraphy", cursive',
-	"Segoe Script": '"Segoe Script", "Bradley Hand", cursive',
-	Pacifico: '"Pacifico", "Comic Sans MS", cursive',
-};
-
-/**
- * Font name variants to check against local fonts.
- * Maps our display label to possible PostScript/family names.
- * @type {Object.<string, string[]>}
- */
-const FONT_VARIANTS = {
-	"Brush Script": ["Brush Script MT", "Brush Script Std", "BrushScriptMT"],
-	"Lucida Handwriting": [
-		"Lucida Handwriting",
-		"Lucida Calligraphy",
-		"LucidaHandwriting",
-	],
-	"Segoe Script": ["Segoe Script", "SegoeScript", "Bradley Hand"],
-	Pacifico: ["Pacifico", "Pacifico-Regular"],
-};
+const SIGNATURE_FONTS = [
+	{
+		value: "Pacifico",
+		label: "Pacifico",
+		fontFamily: "Pacifico, cursive",
+	},
+	{
+		value: "Dancing Script",
+		label: "Dancing Script",
+		fontFamily: '"Dancing Script", cursive',
+	},
+	{
+		value: "Great Vibes",
+		label: "Great Vibes",
+		fontFamily: '"Great Vibes", cursive',
+	},
+	{
+		value: "Caveat",
+		label: "Caveat",
+		fontFamily: "Caveat, cursive",
+	},
+];
 
 /**
  * Unique ID counter for popover associations
  */
 let signatureCounter = 0;
-
-/**
- * Gets available signature fonts using Local Font Access API.
- * Falls back to all fonts if API unavailable or permission denied.
- * @returns {Promise<Array<{value: string, label: string, fontFamily: string}>>}
- */
-async function getAvailableFonts() {
-	if (!("queryLocalFonts" in window)) {
-		return Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
-			value: label,
-			label,
-			fontFamily,
-		}));
-	}
-
-	try {
-		const localFonts = await window.queryLocalFonts();
-		const localFontNames = new Set(
-			localFonts.map((f) => f.family.toLowerCase()),
-		);
-
-		const available = [];
-		for (const [label, fontFamily] of Object.entries(SIGNATURE_FONTS)) {
-			const variants = FONT_VARIANTS[label] || [label];
-			const isAvailable = variants.some((variant) =>
-				localFontNames.has(variant.toLowerCase()),
-			);
-			if (isAvailable) {
-				available.push({ value: label, label, fontFamily });
-			}
-		}
-
-		return available.length > 0
-			? available
-			: Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
-					value: label,
-					label,
-					fontFamily,
-				}));
-	} catch {
-		return Object.entries(SIGNATURE_FONTS).map(([label, fontFamily]) => ({
-			value: label,
-			label,
-			fontFamily,
-		}));
-	}
-}
 
 /**
  * @class ControlSignature
@@ -787,10 +742,10 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	/**
 	 * Shows the signature dialog
 	 */
-	async show_dialog() {
-		// Load fonts if not already loaded
+	show_dialog() {
+		// Initialize font options if not already done (bundled fonts are always available)
 		if (this._font_options.length === 0) {
-			this._font_options = await getAvailableFonts();
+			this._font_options = SIGNATURE_FONTS;
 			this.build_font_options();
 			if (this._font_options.length > 0) {
 				this.select_font(this._font_options[0].value);
@@ -954,9 +909,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		const option = this._font_options.find(
 			(o) => o.value === this._selected_font,
 		);
-		const fontFamily =
-			option?.fontFamily ||
-			SIGNATURE_FONTS[Object.keys(SIGNATURE_FONTS)[0]];
+		const fontFamily = option?.fontFamily || SIGNATURE_FONTS[0].fontFamily;
 
 		this.typed_preview_text.textContent = text;
 		this.typed_preview_text.style.fontFamily = fontFamily;
@@ -1041,9 +994,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		const option = this._font_options.find(
 			(o) => o.value === this._selected_font,
 		);
-		const fontFamily =
-			option?.fontFamily ||
-			SIGNATURE_FONTS[Object.keys(SIGNATURE_FONTS)[0]];
+		const fontFamily = option?.fontFamily || SIGNATURE_FONTS[0].fontFamily;
 
 		const canvas = document.createElement("canvas");
 		canvas.width = 750;

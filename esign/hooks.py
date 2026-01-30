@@ -10,7 +10,10 @@ app_email = "mail@avu.nu"
 app_license = "mit"
 
 app_include_js = ["esign.desk.bundle.js", "esign.control.bundle.js"]
-app_include_css = ["esign.control.bundle.css"]
+app_include_css = [
+	"esign.control.bundle.css",
+	"/assets/esign/public/dist/esign-fonts.css",
+]
 
 # Install/migrate hooks for communication type registration
 after_install = "esign.esign.config.after_install"

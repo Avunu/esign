@@ -147,6 +147,7 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 			[
 				"esign.control.bundle.css",
 				"esign.web.bundle.css",
+				"/assets/esign/dist/esign-fonts.css",
 			]
 		)
 		context.web_include_js.extend(
