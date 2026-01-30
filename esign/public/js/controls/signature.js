@@ -740,6 +740,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 								type: "button",
 								className: [
 									"btn",
+									"btn-md",
 									"signature-btn",
 									"signature-btn-secondary",
 								],
@@ -754,6 +755,7 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 								type: "button",
 								className: [
 									"btn",
+									"btn-md",
 									"signature-btn",
 									"signature-btn-primary",
 								],

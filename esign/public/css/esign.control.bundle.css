@@ -257,6 +257,7 @@
 	display: flex;
 	gap: 1rem;
 	margin-bottom: 1rem;
+	flex-wrap: wrap;
 }
 
 .signature-typed-input {
@@ -267,6 +268,7 @@
 	border: 1px solid var(--border-color);
 	border-radius: var(--border-radius);
 	background: var(--control-bg);
+	max-width: 100%;
 }
 
 .signature-typed-input:focus {

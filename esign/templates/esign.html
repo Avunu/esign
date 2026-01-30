@@ -39,10 +39,10 @@
 		</div>
 		<div class="esign-header-actions">
 			{% if not is_completed %}
-			<button type="button" class="btn btn-primary btn-sm esign-scroll-to-form d-lg-none">
+			<button type="button" class="btn btn-primary btn-md esign-scroll-to-form d-lg-none">
 				{{ _("Sign Now") }}
 			</button>
-			<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-sm">
+			<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-md">
 				{% if frappe_version.startswith('16') %}
 				<svg class="icon icon-sm"><use href="#es-line-download"></use></svg>
 				{% else %}
