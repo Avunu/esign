@@ -1198,12 +1198,10 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	}
 
 	refresh_input() {
-		// Let base class call make_input() first if needed
-		if (!this.has_input) {
-			this.make_input();
-		}
+		// Call base class to handle label, description, mandatory styling, etc.
+		super.refresh_input();
 
-		// Now safe to render
+		// Now safe to render our custom display
 		this.render_display();
 
 		// Update read-only state
