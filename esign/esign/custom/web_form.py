@@ -6,7 +6,7 @@ from typing import TypedDict, cast
 import frappe
 from frappe import _
 from frappe.core.doctype.file.file import File
-from frappe.core.doctype.file.utils import remove_file_by_url
+from frappe.core.doctype.file.utils import get_content_hash, remove_file_by_url
 from frappe.core.doctype.user.user import User
 from frappe.model.docstatus import DocStatus
 from frappe.model.document import Document
@@ -307,6 +307,9 @@ def attach_print_to_document(
 	frappe.request = mock_request
 	frappe.local.request = mock_request
 
+	# Refetch the document to ensure latest data
+	doc.reload()
+
 	# Generate the PDF
 	timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 	print_data = attach_print(
@@ -321,8 +324,11 @@ def attach_print_to_document(
 	# Compute SHA-256 hash of the PDF content
 	pdf_content = print_data["fcontent"]
 	pdf_hash = hashlib.sha256(pdf_content).hexdigest()
+	frappe_content_hash = get_content_hash(pdf_content)
 
 	# Attach the signed PDF to the document
+	# Note: content_hash must be set explicitly for cloud_storage deduplication to work,
+	# as cloud_storage's validate() doesn't call the core File validate which generates it
 	file_doc = cast(
 		File,
 		frappe.get_doc(
@@ -334,11 +340,25 @@ def attach_print_to_document(
 				"folder": "Home/Attachments",
 				"is_private": True,
 				"content": pdf_content,
+				"content_hash": frappe_content_hash,
 			}
 		),
 	)
-	file_doc.save(ignore_permissions=True)
-	file_doc.write_file()
+	file_doc.insert(ignore_permissions=True)
+
+	# Check if this is a cloud_storage-enhanced File (has s3_key and file_association attributes)
+	is_cloud_storage = hasattr(file_doc, "s3_key") and hasattr(file_doc, "file_association")
+
+	if is_cloud_storage:
+		# Extract s3_key from the file_url and persist it
+		s3_key = str(file_doc.file_url or "").replace("/api/method/retrieve?key=", "")
+		if s3_key:
+			file_doc.db_set("s3_key", s3_key)
+
+	# Commit the file transaction to avoid deadlock with Communication's _comments update.
+	# Cloud storage's associate_files() may have modified the parent document, and the
+	# Communication insert will try to update _comments on the same document.
+	frappe.db.commit()
 
 	# Create Communication record for timeline display with audit data as JSON
 	audit_content = json.dumps(
@@ -365,19 +385,40 @@ def attach_print_to_document(
 	)
 	comm.insert(ignore_permissions=True)
 
-	# Also attach a copy of the PDF to the Communication for easy retrieval
-	comm_file_doc = frappe.get_doc(
-		{
-			"doctype": "File",
-			"file_name": print_data["fname"],
-			"attached_to_doctype": "Communication",
-			"attached_to_name": comm.name,
-			"folder": "Home/Attachments",
-			"is_private": True,
-			"content": pdf_content,
-		}
-	)
-	comm_file_doc.save(ignore_permissions=True)
+	# Associate the PDF with the Communication
+	if is_cloud_storage:
+		# For cloud_storage, add a file_association instead of duplicating the file
+		from frappe.utils import get_datetime
+
+		file_doc.reload()
+		file_doc.append(
+			"file_association",
+			{
+				"link_doctype": "Communication",
+				"link_name": comm.name,
+				"user": frappe.session.user,
+				"timestamp": get_datetime(),
+			},
+		)
+		file_doc.save(ignore_permissions=True)
+	else:
+		# For standard Frappe, create a separate file attachment
+		comm_file_doc = cast(
+			File,
+			frappe.get_doc(
+				{
+					"doctype": "File",
+					"file_name": print_data["fname"],
+					"attached_to_doctype": "Communication",
+					"attached_to_name": comm.name,
+					"folder": "Home/Attachments",
+					"is_private": True,
+					"content": pdf_content,
+					"content_hash": frappe_content_hash,
+				}
+			),
+		)
+		comm_file_doc.save(ignore_permissions=True)
 
 
 def extract_param_from_referrer(param: str = "") -> str:
@@ -812,8 +853,8 @@ def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 		job_id=f"attach_print_to_{doc.doctype}_{doc.name}",
 		deduplicate=True,
 		timeout=300,
-		doc=doc,
 		enqueue_after_commit=True,
+		doc=doc,
 		print_format=print_format,
 		request_data=request_data,
 		audit_data=audit_data,
