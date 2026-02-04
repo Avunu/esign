@@ -95,6 +95,7 @@
 	inset: 0;
 	margin: auto;
 	width: min(90vw, 700px);
+	height: min(90vh, 455px);
 	max-height: 90vh;
 	padding: 0;
 	border: 1px solid var(--border-color);
