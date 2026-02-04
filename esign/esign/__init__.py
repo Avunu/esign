@@ -46,7 +46,7 @@ def get_timeline_content(doctype: str, docname: str) -> list[dict]:
 		# Get the attached signed PDF file URL using the patched get_attachments
 		# This works for both standard Frappe and cloud_storage setups
 		file_url = None
-		attachments = frappe.desk.form.load.get_attachments("Communication", comm.name) # type: ignore
+		attachments = frappe.desk.form.load.get_attachments("Communication", comm.name)  # type: ignore
 		for attachment in attachments:
 			if attachment.get("file_name", "").endswith(".pdf"):
 				file_url = attachment.get("file_url")
