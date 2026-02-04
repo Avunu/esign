@@ -1050,14 +1050,13 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		const signatureLineY = canvas.height * 0.75;
 
 		// Start with a large font size and scale down if text is too wide
-		let fontSize = 80;
-		const maxWidth = canvas.width - 40; // 20px padding on each side
+		let fontSize = 120;
 
 		ctx.font = `italic ${fontSize}px ${fontFamily}`;
 		let textWidth = ctx.measureText(text).width;
 
 		// Scale down font if text is too wide
-		while (textWidth > maxWidth && fontSize > 20) {
+		while (textWidth > canvas.width && fontSize > 20) {
 			fontSize -= 2;
 			ctx.font = `italic ${fontSize}px ${fontFamily}`;
 			textWidth = ctx.measureText(text).width;
