@@ -1043,12 +1043,26 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 		ctx.fillStyle = "#000000";
-		ctx.font = `italic 50px ${fontFamily}`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "alphabetic";
 
 		// Draw text at 75% from top (on the signature line)
 		const signatureLineY = canvas.height * 0.75;
+
+		// Start with a large font size and scale down if text is too wide
+		let fontSize = 80;
+		const maxWidth = canvas.width - 40; // 20px padding on each side
+
+		ctx.font = `italic ${fontSize}px ${fontFamily}`;
+		let textWidth = ctx.measureText(text).width;
+
+		// Scale down font if text is too wide
+		while (textWidth > maxWidth && fontSize > 20) {
+			fontSize -= 2;
+			ctx.font = `italic ${fontSize}px ${fontFamily}`;
+			textWidth = ctx.measureText(text).width;
+		}
+
 		ctx.fillText(text, canvas.width / 2, signatureLineY);
 
 		return canvas.toDataURL("image/png");
