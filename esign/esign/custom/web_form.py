@@ -867,6 +867,11 @@ def accept(web_form, data):
 	if wf.allow_incomplete:
 		doc.flags.ignore_mandatory = True
 
+	# Allow setting set_only_once fields (like signatures) that haven't been set yet.
+	# eSign forms are specifically designed to allow first-time setting of signature
+	# fields on submitted documents via key-based access.
+	doc.flags.ignore_validate_constants = True
+
 	# Set web form field values
 	for field in wf.web_form_fields:
 		fieldname = field.fieldname
