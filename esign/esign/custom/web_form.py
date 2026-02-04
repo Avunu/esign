@@ -13,7 +13,7 @@ from frappe.model.document import Document
 from frappe.rate_limiter import rate_limit
 from frappe.twofactor import get_qr_svg_code
 from frappe.types import DF
-from frappe.utils import get_frappe_version
+from frappe.utils import get_frappe_version, now
 from frappe.website.doctype.web_form.web_form import WebForm as BaseWebForm
 from frappe.www.printview import validate_print_permission
 
@@ -889,7 +889,7 @@ def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) ->
 				signed_fields.append(field.label or field.fieldname)
 
 	return AuditData(
-		timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+		timestamp=now(),
 		ip_address=ip_address,
 		user_agent=user_agent,
 		signer_email=signer_email,
