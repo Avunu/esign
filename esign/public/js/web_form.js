@@ -1,9 +1,11 @@
 frappe.ui.form.on("Web Form", {
 	refresh: function (frm) {
 		frm.doc.doc_type ? frm.events.update_field_options(frm) : null;
+		frm.events.set_notification_query(frm);
 	},
 	doc_type: function (frm) {
 		frm.events.update_field_options(frm);
+		frm.events.set_notification_query(frm);
 	},
 	update_field_options: function (frm) {
 		var doc = frm.doc;
@@ -24,6 +26,18 @@ frappe.ui.form.on("Web Form", {
 				"options",
 				[""].concat(fieldnames),
 			);
+		});
+	},
+	set_notification_query: function (frm) {
+		// Filter notifications to only show Custom event notifications for the same doctype
+		frm.set_query("esign_notification", function () {
+			return {
+				filters: {
+					document_type: frm.doc.doc_type,
+					event: "Custom",
+					enabled: 1,
+				},
+			};
 		});
 	},
 });

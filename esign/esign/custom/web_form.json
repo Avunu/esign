@@ -77,6 +77,43 @@
             "label": "Value To Be Set",
             "module": "eSign",
             "name": "Web Form-esign_update_value"
+        },
+        {
+            "dt": "Web Form",
+            "fieldname": "esign_notification_section",
+            "fieldtype": "Section Break",
+            "depends_on": "eval:doc.esign_enabled==1",
+            "options": "",
+            "insert_after": "esign_update_value",
+            "is_system_generated": 1,
+            "label": "Notification Settings",
+            "module": "eSign",
+            "name": "Web Form-esign_notification_section"
+        },
+        {
+            "dt": "Web Form",
+            "fieldname": "esign_send_notification",
+            "fieldtype": "Check",
+            "description": "Send a notification after the document is signed, with the validated signed PDF attached.",
+            "options": "",
+            "insert_after": "esign_notification_section",
+            "is_system_generated": 1,
+            "label": "Send Notification on Response",
+            "module": "eSign",
+            "name": "Web Form-esign_send_notification"
+        },
+        {
+            "dt": "Web Form",
+            "fieldname": "esign_notification",
+            "fieldtype": "Link",
+            "description": "Select a Notification with Event set to 'Custom' for the same DocType. The signed PDF will be attached instead of regenerating the print.",
+            "options": "Notification",
+            "depends_on": "eval:doc.esign_send_notification==1",
+            "insert_after": "esign_send_notification",
+            "is_system_generated": 1,
+            "label": "Notification",
+            "module": "eSign",
+            "name": "Web Form-esign_notification"
         }
     ],
     "custom_perms": [],

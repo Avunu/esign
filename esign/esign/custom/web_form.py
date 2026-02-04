@@ -8,12 +8,14 @@ from frappe import _
 from frappe.core.doctype.file.file import File
 from frappe.core.doctype.file.utils import get_content_hash, remove_file_by_url
 from frappe.core.doctype.user.user import User
+from frappe.email.doctype.notification.notification import Notification
+from frappe.model import numeric_fieldtypes
 from frappe.model.docstatus import DocStatus
 from frappe.model.document import Document
 from frappe.rate_limiter import rate_limit
 from frappe.twofactor import get_qr_svg_code
 from frappe.types import DF
-from frappe.utils import get_frappe_version, now
+from frappe.utils import cint, get_frappe_version, now
 from frappe.website.doctype.web_form.web_form import WebForm as BaseWebForm
 from frappe.www.printview import validate_print_permission
 
@@ -95,6 +97,8 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 	esign_update_field: DF.Select[""] | None
 	esign_update_value: DF.Data | None
 	esign_submit_on_response: DF.Check | None
+	esign_send_notification: DF.Check | None
+	esign_notification: DF.Link | None
 
 	def get_context(self, context):
 		cur_doc_name = frappe.form_dict.get("name", context.doc_name)
@@ -285,11 +289,13 @@ def attach_print_to_document(
 	print_format: str,
 	request_data: RequestData,
 	audit_data: AuditData,
+	notification_name: str | None = None,
 ):
 	"""Background job to attach the signed PDF to the document.
 
 	Also records audit trail and SHA-256 hash for document integrity verification.
 	Creates a Communication record for timeline display via additional_timeline_content hook.
+	Optionally triggers a notification with the validated signed PDF attached.
 	"""
 	from frappe import attach_print
 
@@ -419,6 +425,150 @@ def attach_print_to_document(
 			),
 		)
 		comm_file_doc.save(ignore_permissions=True)
+
+	# Trigger notification with the validated signed PDF attached
+	if notification_name:
+		_send_esign_notification(notification_name, doc, file_doc)
+
+
+def _send_esign_notification(notification_name: str, doc: Document, file_doc: File):
+	"""Send a notification with the validated signed PDF attached.
+
+	Instead of letting the notification regenerate the PDF via attach_print,
+	we directly attach the already-validated signed PDF file.
+	"""
+	from email.utils import formataddr
+
+	from frappe.core.doctype.communication.email import _make as make_communication
+	from frappe.email.doctype.notification.notification import get_context
+
+	try:
+		notification = cast(Notification, frappe.get_doc("Notification", notification_name))
+
+		# Validate notification configuration
+		if notification.document_type != doc.doctype:
+			frappe.log_error(
+				title="eSign: Notification doctype mismatch",
+				message=f"Notification '{notification_name}' is for {notification.document_type}, not {doc.doctype}",
+			)
+			return
+
+		if notification.event != "Custom":
+			frappe.log_error(
+				title="eSign: Notification event not Custom",
+				message=f"Notification '{notification_name}' event is '{notification.event}', expected 'Custom'",
+			)
+			return
+
+		if not notification.enabled:
+			frappe.log_error(
+				title="eSign: Notification disabled",
+				message=f"Notification '{notification_name}' is not enabled",
+			)
+			return
+
+		# Build context similar to how Notification.send() does it
+		context = get_context(doc)
+		context = {"doc": doc, "alert": notification, "comments": None}
+		if doc.get("_comments"):
+			context["comments"] = json.loads(str(doc.get("_comments", "[]")))
+
+		if notification.is_standard:
+			notification.load_standard_properties(context)
+
+		# Only handle Email channel - other channels don't support file attachments in the same way
+		if notification.channel != "Email":
+			frappe.log_error(
+				title="eSign: Notification channel not Email",
+				message=f"eSign notification with signed PDF attachment only supports Email channel, not '{notification.channel}'",
+			)
+			return
+
+		# Render subject and message
+		subject = notification.subject
+		if subject and "{" in subject:
+			subject = frappe.render_template(notification.subject, context)
+
+		message = frappe.render_template(notification.message, context)
+
+		# Get recipients
+		recipients, cc, bcc = notification.get_list_of_recipients(doc, context)
+		if not (recipients or cc or bcc):
+			return
+
+		# Build sender
+		sender = None
+		if notification.sender and notification.sender_email:
+			sender = formataddr((notification.sender, notification.sender_email))
+
+		# Use the validated signed PDF as the attachment instead of regenerating
+		attachments = [{"file_url": file_doc.file_url}]
+
+		# Create communication record
+		communication = None
+		if doc.doctype != "Communication":
+			communication = make_communication(
+				doctype=doc.doctype,
+				name=doc.name,
+				content=message,
+				subject=subject,
+				sender=sender,
+				recipients=recipients,
+				communication_medium="Email",
+				send_email=False,
+				attachments=attachments,
+				cc=cc,
+				bcc=bcc,
+				communication_type="Automated Message",
+			).get("name")
+
+		# Send the email with the validated PDF attached
+		frappe.sendmail(
+			recipients=recipients,
+			subject=str(subject),
+			sender=sender or "",
+			cc=cc,
+			bcc=bcc,
+			message=message or "",
+			reference_doctype=doc.doctype,
+			reference_name=doc.name,
+			attachments=attachments,
+			expose_recipients="header",
+			print_letterhead=False,
+			communication=communication,
+		)
+
+		# Handle set_property_after_alert if configured
+		if notification.set_property_after_alert:
+			allow_update = True
+			field_df = doc.meta.get_field(notification.set_property_after_alert)
+			if doc.docstatus.is_submitted() and field_df and not field_df.allow_on_submit:
+				allow_update = False
+			try:
+				if allow_update and not doc.flags.in_notification_update:
+					fieldname = notification.set_property_after_alert
+					value: str | int | float | None = notification.property_value
+					if field_df and field_df.fieldtype in numeric_fieldtypes:
+						value = cint(value or 0)
+
+					doc.reload()
+					doc.set(fieldname, value)
+					doc.flags.updater_reference = {
+						"doctype": notification.doctype,
+						"docname": notification.name,
+						"label": _("via eSign Notification"),
+					}
+					doc.flags.in_notification_update = True
+					doc.save(ignore_permissions=True)
+					doc.flags.in_notification_update = False
+			except Exception:
+				frappe.log_error(title="eSign: Document update failed after notification")
+
+	except Exception as e:
+		frappe.log_error(
+			title=f"eSign: Failed to send notification for {doc.doctype} {doc.name}",
+			message=str(e),
+		)
 
 
 def extract_param_from_referrer(param: str = "") -> str:
@@ -847,6 +997,11 @@ def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 	# Collect audit data
 	audit_data = _collect_audit_data(doc, wf, print_format)
 
+	# Get notification name if configured
+	notification_name = None
+	if wf.esign_send_notification and wf.esign_notification:
+		notification_name = wf.esign_notification
+
 	frappe.enqueue(
 		attach_print_to_document,
 		queue="short",
@@ -858,6 +1013,7 @@ def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 		print_format=print_format,
 		request_data=request_data,
 		audit_data=audit_data,
+		notification_name=notification_name,
 	)
 
 
