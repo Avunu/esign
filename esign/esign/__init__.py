@@ -39,18 +39,18 @@ def get_timeline_content(doctype: str, docname: str) -> list[dict]:
 		audit_data = {}
 		if comm.content:
 			try:
-				import json
-
 				audit_data = json.loads(comm.content)
 			except (json.JSONDecodeError, TypeError):
 				pass
 
-		# Get the attached signed PDF file URL
-		file_url = frappe.db.get_value(
-			"File",
-			{"attached_to_name": comm.name, "attached_to_doctype": "Communication"},
-			"file_url",
-		)
+		# Get the attached signed PDF file URL using the patched get_attachments
+		# This works for both standard Frappe and cloud_storage setups
+		file_url = None
+		attachments = frappe.desk.form.load.get_attachments("Communication", comm.name) # type: ignore
+		for attachment in attachments:
+			if attachment.get("file_name", "").endswith(".pdf"):
+				file_url = attachment.get("file_url")
+				break
 
 		timeline_contents.append(
 			{
