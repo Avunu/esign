@@ -16,9 +16,9 @@ app_include_css = [
 ]
 
 # Install/migrate hooks for communication type registration
-after_install = "esign.esign.config.after_install"
-after_migrate = "esign.esign.config.after_migrate"
-after_uninstall = "esign.esign.config.after_uninstall"
+after_install = "esign.config.after_install"
+after_migrate = "esign.config.after_migrate"
+after_uninstall = "esign.config.after_uninstall"
 
 # Timeline integration for eSign audit trail
 additional_timeline_content = {
