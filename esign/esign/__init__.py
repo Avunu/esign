@@ -113,6 +113,7 @@ def send_esign_email(
 	bcc=None,
 	print_format=None,
 	send_me_a_copy=False,
+	email_account=None,
 ):
 	"""Send eSign email with embedded eSign link"""
 
@@ -191,6 +192,13 @@ def send_esign_email(
 		email_content += link_html
 
 	try:
+		# Resolve sender from email account if provided
+		sender = frappe.session.user
+		if email_account:
+			account_email = frappe.db.get_value("Email Account", email_account, "email_id")
+			if account_email:
+				sender = account_email
+
 		# Create communication record
 		comm = Communication(
 			{
@@ -201,7 +209,8 @@ def send_esign_email(
 				"email_status": "Open",
 				"subject": subject,
 				"content": email_content,
-				"sender": frappe.session.user,
+				"sender": sender,
+				"email_account": email_account or None,
 				"recipients": ", ".join(recipients_list),
 				"cc": ", ".join(cc_list) if cc_list else "",
 				"bcc": ", ".join(bcc_list) if bcc_list else "",

@@ -131,6 +131,19 @@ class ESignDialog {
 					fieldname: "send_me_a_copy",
 				},
 				{
+					label: __("Email Account"),
+					fieldtype: "Link",
+					options: "Email Account",
+					fieldname: "email_account",
+					get_query: () => {
+						const filters = { enable_outgoing: 1 };
+						if (this.frm.doc.company) {
+							filters.company = this.frm.doc.company;
+						}
+						return { filters };
+					},
+				},
+				{
 					label: __("Print Format"),
 					fieldtype: "Link",
 					options: "Print Format",
@@ -177,12 +190,44 @@ class ESignDialog {
 					);
 					this.dialog.set_value("web_form", options[0]?.value);
 					this.dialog.show();
+					this.prefill_email_account();
 				} else {
 					frappe.msgprint(
 						__("No eSign-enabled web forms found for {0}", [
 							this.frm.doctype,
 						]),
 					);
+				}
+			},
+		});
+	}
+
+	prefill_email_account() {
+		const filters = { enable_outgoing: 1 };
+		if (this.frm.doc.company) {
+			filters.company = this.frm.doc.company;
+		}
+		frappe.call({
+			method: "frappe.client.get_list",
+			args: {
+				doctype: "Email Account",
+				filters,
+				fields: ["name", "default_outgoing"],
+				limit_page_length: 0,
+			},
+			callback: (r) => {
+				if (!r.message || r.message.length === 0) return;
+
+				const accounts = r.message;
+				const default_account = accounts.find(
+					(a) => a.default_outgoing,
+				);
+				const selected =
+					default_account ||
+					(accounts.length === 1 ? accounts[0] : null);
+
+				if (selected) {
+					this.dialog.set_value("email_account", selected.name);
 				}
 			},
 		});
@@ -318,6 +363,7 @@ class ESignDialog {
 				web_form: values.web_form,
 				print_format: values.print_format,
 				send_me_a_copy: values.send_me_a_copy,
+				email_account: values.email_account,
 			},
 			freeze: true,
 			freeze_message: __("Sending eSign request..."),
