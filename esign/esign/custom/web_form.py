@@ -429,14 +429,21 @@ def attach_print_to_document(
 
 	# Trigger notification with the validated signed PDF attached
 	if notification_name:
-		_send_esign_notification(notification_name, doc, file_doc)
+		_send_esign_notification(notification_name, doc, file_doc, audit_data, pdf_hash)
 
 
-def _send_esign_notification(notification_name: str, doc: Document, file_doc: File):
+def _send_esign_notification(
+	notification_name: str,
+	doc: Document,
+	file_doc: File,
+	audit_data: AuditData | None = None,
+	pdf_hash: str | None = None,
+):
 	"""Send a notification with the validated signed PDF attached.
 
 	Instead of letting the notification regenerate the PDF via attach_print,
 	we directly attach the already-validated signed PDF file.
+	Appends the eSign audit trail to the email body for external verification.
 	"""
 	from email.utils import formataddr
 
@@ -491,6 +498,42 @@ def _send_esign_notification(notification_name: str, doc: Document, file_doc: Fi
 			subject = frappe.render_template(notification.subject, context)
 
 		message = frappe.render_template(notification.message, context)
+
+		# Append audit trail information to the notification email
+		if audit_data:
+			audit_rows = []
+			if audit_data.get("signer_name"):
+				audit_rows.append((_("Signer"), audit_data["signer_name"]))
+			if audit_data.get("signer_email"):
+				audit_rows.append((_("Email"), audit_data["signer_email"]))
+			if audit_data.get("timestamp"):
+				audit_rows.append((_("Signed At"), audit_data["timestamp"]))
+			if audit_data.get("ip_address"):
+				audit_rows.append((_("IP Address"), audit_data["ip_address"]))
+			if audit_data.get("user_agent"):
+				audit_rows.append((_("User Agent"), audit_data["user_agent"]))
+			if audit_data.get("web_form"):
+				audit_rows.append((_("Web Form"), audit_data["web_form"]))
+			if audit_data.get("print_format"):
+				audit_rows.append((_("Print Format"), audit_data["print_format"]))
+			if audit_data.get("signed_fields"):
+				audit_rows.append((_("Signed Fields"), ", ".join(audit_data["signed_fields"])))
+			if pdf_hash:
+				audit_rows.append((_("PDF SHA-256"), pdf_hash))
+
+			if audit_rows:
+				table_rows = "".join(
+					f'<tr><td style="padding:4px 8px;font-weight:bold;white-space:nowrap;vertical-align:top;">{label}</td>'
+					f'<td style="padding:4px 8px;word-break:break-all;">{value}</td></tr>'
+					for label, value in audit_rows
+				)
+				message += (
+					f'<div style="margin-top:20px;padding:15px;background-color:#f8f9fa;'
+					f'border-left:4px solid #6c757d;border-radius:4px;">'
+					f'<h4 style="margin:0 0 10px 0;color:#495057;">{_("eSign Audit Trail")}</h4>'
+					f'<table style="border-collapse:collapse;font-size:13px;">{table_rows}</table>'
+					f"</div>"
+				)
 
 		# Get recipients
 		recipients, cc, bcc = notification.get_list_of_recipients(doc, context)
