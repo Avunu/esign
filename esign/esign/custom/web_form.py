@@ -140,6 +140,14 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		form_fields.add("name")
 		form_fields.add("doctype")
 		context.reference_doc = {k: v for k, v in doc.as_dict().items() if k in form_fields}
+
+		# Pre-fill email field from URL param (e.g. when link was sent via email)
+		email_param = frappe.form_dict.get("email", "")
+		if email_param:
+			email_fieldname = _find_email_fieldname(self)
+			if email_fieldname and email_fieldname in form_fields:
+				context.reference_doc[email_fieldname] = email_param
+
 		super().add_custom_context_and_script(context)
 
 		context.key = key  # Pass key to frontend for async API calls
@@ -633,8 +641,19 @@ def extract_param_from_referrer(param: str = "") -> str:
 
 
 @frappe.whitelist()
-def get_esign_link(doc: "Document", web_form_name: str, print_format_name: str = "") -> str:
-	"""Get the eSign Web Form link for a given document and web form name."""
+def get_esign_link(
+	doc: "Document", web_form_name: str, print_format_name: str = "", recipient_email: str = ""
+) -> str:
+	"""Get the eSign Web Form link for a given document and web form name.
+
+	Args:
+		doc: The document (or JSON/dict) to generate the link for
+		web_form_name: Name of the eSign-enabled Web Form
+		print_format_name: Optional print format override
+		recipient_email: Optional email of the intended signer; appended as
+			``&email=`` so the web form can pre-fill a Data(Email) field and
+			record the signer in the audit trail.
+	"""
 	if isinstance(doc, str):
 		try:
 			doc = json.loads(doc)
@@ -661,6 +680,10 @@ def get_esign_link(doc: "Document", web_form_name: str, print_format_name: str =
 		query_string = f"?key={share_key}"
 		if print_format_name:
 			query_string += f"&format={print_format_name}"
+		if recipient_email:
+			from urllib.parse import quote
+
+			query_string += f"&email={quote(recipient_email)}"
 
 		return f"{base_url}{web_form_path}{query_string}"
 
@@ -1079,7 +1102,13 @@ def _enqueue_print_attachment(doc: Document, wf: "EsignWebForm"):
 
 
 def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) -> AuditData:
-	"""Collect audit trail data at the moment of signing."""
+	"""Collect audit trail data at the moment of signing.
+
+	Signer email resolution order:
+	  1. ``email`` URL search param (set when the eSign link was emailed)
+	  2. A Data field with Options="Email" on the web form (filled by the signer)
+	  3. The logged-in Frappe user (if not Guest)
+	"""
 	# Get IP address from various possible headers (proxy-aware)
 	ip_address = _get_client_ip()
 
@@ -1088,13 +1117,32 @@ def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) ->
 	if hasattr(frappe, "request") and frappe.request:
 		user_agent = frappe.request.headers.get("User-Agent")
 
-	# Get signer information
+	# --- Resolve signer email ---
 	signer_email = None
 	signer_name = None
-	if frappe.session.user and frappe.session.user != "Guest":
+
+	# 1. From the email URL search param (link was sent via email)
+	email_param = extract_param_from_referrer("email")
+	if email_param:
+		signer_email = email_param
+
+	# 2. From a Data(Email) field on the web form
+	if not signer_email:
+		email_fieldname = _find_email_fieldname(wf)
+		if email_fieldname:
+			signer_email = doc.get(email_fieldname) or None
+
+	# 3. Fall back to the logged-in user
+	if not signer_email and frappe.session.user and frappe.session.user != "Guest":
 		signer_email = frappe.session.user
-		user_doc = cast(User, frappe.get_cached_doc("User", frappe.session.user))
-		signer_name = user_doc.full_name if user_doc else None
+
+	# Resolve signer name from user record when we have an email that matches a User
+	if signer_email:
+		try:
+			user_doc = cast(User, frappe.get_cached_doc("User", signer_email))
+			signer_name = user_doc.full_name if user_doc else None
+		except frappe.DoesNotExistError:
+			pass
 
 	# Identify which signature fields were filled
 	signed_fields = []
@@ -1115,6 +1163,23 @@ def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) ->
 		print_format=print_format,
 		signed_fields=signed_fields,
 	)
+
+
+def _find_email_fieldname(wf: "EsignWebForm") -> str | None:
+	"""Find the fieldname of a Data field with Options='Email' on the web form.
+
+	Checks the underlying doctype meta for the field options, since web form
+	field rows don't always carry ``options`` from the doctype definition.
+
+	Returns the fieldname if found, otherwise ``None``.
+	"""
+	meta = frappe.get_meta(wf.doc_type)
+	for field in wf.web_form_fields:
+		if field.fieldtype == "Data" and field.fieldname:
+			df = meta.get_field(field.fieldname)
+			if df and df.fieldtype == "Data" and (df.options or "").strip().lower() == "email":
+				return field.fieldname
+	return None
 
 
 def _get_client_ip() -> str | None:
