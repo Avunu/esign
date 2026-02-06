@@ -1105,9 +1105,9 @@ def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) ->
 	"""Collect audit trail data at the moment of signing.
 
 	Signer email resolution order:
-	  1. ``email`` URL search param (set when the eSign link was emailed)
-	  2. A Data field with Options="Email" on the web form (filled by the signer)
-	  3. The logged-in Frappe user (if not Guest)
+		1. ``email`` URL search param (set when the eSign link was emailed)
+		2. A Data field with Options="Email" on the web form (filled by the signer)
+		3. The logged-in Frappe user (if not Guest)
 	"""
 	# Get IP address from various possible headers (proxy-aware)
 	ip_address = _get_client_ip()
