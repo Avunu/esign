@@ -793,7 +793,8 @@ def download_signed_pdf(doctype: str, docname: str, key: str = ""):
 	# there instead.
 	if file_url.startswith("/api/method/retrieve"):
 		full_file = frappe.get_doc("File", file_doc.get("name"))
-		if not full_file.get("sharing_link"):
+		sharing_uuid = full_file.get("sharing_link")
+		if not sharing_uuid:
 			sharing_uuid = uuid.uuid4()
 			full_file.db_set("sharing_link", str(int(sharing_uuid) >> 64))
 			frappe.db.commit()  # ensure sharing_link is saved before redirect
