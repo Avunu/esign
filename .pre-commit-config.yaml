@@ -18,7 +18,7 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    rev: v0.15.0
     hooks:
       - id: ruff
         name: "Run ruff import sorter"
@@ -34,6 +34,7 @@ repos:
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
+        files: "esign/"
         types_or: [javascript, vue, scss]
         # Ignore any files that might contain jinja / bundles
         exclude: |
@@ -50,6 +51,7 @@ repos:
     rev: v10.0.0-rc.2
     hooks:
       - id: eslint
+        files: "esign/"
         types_or: [javascript]
         args: ['--quiet']
         additional_dependencies: 
