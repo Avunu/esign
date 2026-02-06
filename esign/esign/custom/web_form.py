@@ -1,5 +1,6 @@
 import hashlib
 import json
+import uuid
 from datetime import datetime
 from typing import TypedDict, cast
 
@@ -785,7 +786,22 @@ def download_signed_pdf(doctype: str, docname: str, key: str = ""):
 		file_type="pdf",
 	)
 
-	# Handle private vs public files
+	# Handle cloud storage files — the /api/method/retrieve endpoint runs a permission
+	# check (frappe.has_permission) that fails for Guest users authenticating via an
+	# eSign print key.  The /api/method/share endpoint, however, generates a presigned
+	# URL without any permission gate, so we set a sharing_link on the File and redirect
+	# there instead.
+	if file_url.startswith("/api/method/retrieve"):
+		full_file = frappe.get_doc("File", file_doc.get("name"))
+		if not full_file.get("sharing_link"):
+			sharing_uuid = uuid.uuid4()
+			full_file.db_set("sharing_link", str(int(sharing_uuid) >> 64))
+			frappe.db.commit()  # ensure sharing_link is saved before redirect
+		frappe.local.response["type"] = "redirect"
+		frappe.local.response["location"] = f"/api/method/share?key={sharing_uuid}"
+		return
+
+	# Handle private vs public files (local storage)
 	if file_doc.get("is_private") and file_url.startswith("/private/files/"):
 		# Extract the path after /private
 		private_path = file_url.split("/private", 1)[1]
