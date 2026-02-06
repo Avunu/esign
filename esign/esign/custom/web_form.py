@@ -512,10 +512,6 @@ def _send_esign_notification(
 				audit_rows.append((_("IP Address"), audit_data["ip_address"]))
 			if audit_data.get("user_agent"):
 				audit_rows.append((_("User Agent"), audit_data["user_agent"]))
-			if audit_data.get("web_form"):
-				audit_rows.append((_("Web Form"), audit_data["web_form"]))
-			if audit_data.get("print_format"):
-				audit_rows.append((_("Print Format"), audit_data["print_format"]))
 			if audit_data.get("signed_fields"):
 				audit_rows.append((_("Signed Fields"), ", ".join(audit_data["signed_fields"])))
 			if pdf_hash:
