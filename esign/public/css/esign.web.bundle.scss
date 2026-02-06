@@ -11,10 +11,18 @@
 		display: block !important;
 		overflow-x: clip !important;
 		overflow-y: hidden !important; // Prevent double scrollbars
+
+		@include media-breakpoint-down(md) {
+			overflow-y: auto !important;
+		}
 	}
 
 	body {
 		overflow: hidden;
+
+		@include media-breakpoint-down(md) {
+			overflow: auto;
+		}
 	}
 
 	// Hide tooltips
@@ -39,6 +47,7 @@
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
+		height: 100dvh; // accounts for mobile browser chrome (URL bar, bottom toolbar)
 		width: 100vw;
 		overflow: hidden;
 		background-color: var(--bg-color, #f5f5f5);
@@ -309,6 +318,7 @@
 
 	.esign-form-footer {
 		padding: 1rem 1.5rem;
+		padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
 		border-top: 1px solid var(--border-color, #e5e5e5);
 		background-color: var(--card-bg, #fff);
 	}
@@ -471,13 +481,25 @@
 	}
 
 	// ============================================
+	// Tablet / small desktop overrides (md < width < lg)
+	// .esign-main gets column layout at the lg breakpoint but
+	// the base overflow: hidden is still set — allow scrolling.
+	// ============================================
+	@include media-breakpoint-down(lg) {
+		.esign-main {
+			overflow: auto;
+		}
+	}
+
+	// ============================================
 	// Mobile Overrides
 	// ============================================
 	@include media-breakpoint-down(md) {
 		.esign-layout {
 			height: auto;
 			min-height: 100vh;
-			overflow: scroll;
+			min-height: 100dvh;
+			overflow: visible;
 		}
 
 		.esign-main {
