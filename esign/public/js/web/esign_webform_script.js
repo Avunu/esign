@@ -174,16 +174,6 @@ function initDocumentPreview() {
 		clearTimeout(resizeTimeout);
 		resizeTimeout = setTimeout(scaleToFitDocumentPane, 150);
 	});
-
-	// "Sign Now" button - scroll to form on mobile
-	document.querySelectorAll(".esign-scroll-to-form").forEach((btn) => {
-		btn.addEventListener("click", () => {
-			const sidebar = document.querySelector(".esign-sidebar");
-			if (sidebar) {
-				sidebar.scrollIntoView({ behavior: "smooth", block: "start" });
-			}
-		});
-	});
 }
 
 // ============================================================================
