@@ -2,28 +2,24 @@ import { defineConfig } from "vite";
 import path from "path";
 
 export default defineConfig({
+  base: "./",
   build: {
-    lib: {
-      // Entry point that just imports the fonts
-      entry: path.resolve(__dirname, "esign/public/js/fonts.js"),
-      name: "ESignFonts",
-      fileName: "esign-fonts",
-      formats: ["es"],
-    },
     outDir: "esign/public/dist",
     emptyOutDir: false,
-    minify: true,
-    target: "es2022",
+    assetsInlineLimit: 0,
     rollupOptions: {
+      input: path.resolve(__dirname, "esign/public/js/fonts.js"),
       output: {
-        // Ensure CSS is extracted to a separate file
-        assetFileNames: "esign-fonts.[ext]",
+        entryFileNames: "esign-fonts.js",
+        assetFileNames: (assetInfo) => {
+          // Keep font files in a fonts/ subdirectory
+          if (/\.(woff2?|ttf|otf|eot)$/.test(assetInfo.names?.[0] ?? "")) {
+            return "fonts/[name][extname]";
+          }
+          // CSS output
+          return "esign-fonts[extname]";
+        },
       },
     },
-  },
-  define: {
-    "process.env.NODE_ENV": JSON.stringify(
-      process.env.NODE_ENV || "production",
-    ),
   },
 });
