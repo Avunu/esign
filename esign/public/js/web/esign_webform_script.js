@@ -175,17 +175,20 @@ function initDocumentPreview() {
 		resizeTimeout = setTimeout(scaleToFitDocumentPane, 150);
 	});
 
-	// "Sign Now" button - scroll to form on mobile
-	document.getElementById("sign-now-button").forEach((button) => {
-		button.addEventListener("click", () => {
-			const esignForm = document.getElementById("esign-form");
-			if (esignForm) {
-				esignForm.scrollIntoView({
-					behavior: "smooth",
-					block: "start",
-				});
-			}
-		});
+	// "Sign Now" button - scroll to form on mobile (deferred until ready)
+	frappe.ready(() => {
+		const button = document.getElementById("sign-now-button");
+		if (button) {
+			button.addEventListener("click", () => {
+				const esignForm = document.getElementById("esign-form");
+				if (esignForm) {
+					esignForm.scrollIntoView({
+						behavior: "smooth",
+						block: "start",
+					});
+				}
+			});
+		}
 	});
 }
 
