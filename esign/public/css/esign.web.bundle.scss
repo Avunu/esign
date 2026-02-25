@@ -22,8 +22,12 @@
 		overflow: hidden;
 
 		@include media-breakpoint-down(md) {
-			overflow: auto;
-			scroll-behavior: smooth;
+			// Don't use `overflow: auto` here — it creates a SECOND scroll
+			// container (body) beneath the viewport (which already scrolls via
+			// html's `overflow-y: auto`). Two nested scroll containers break
+			// anchor-link scrolling in Chrome Mobile because the browser
+			// scrolls body (a no-op) instead of the viewport.
+			overflow: visible;
 		}
 	}
 
@@ -72,7 +76,6 @@
 		@include media-breakpoint-down(md) {
 			padding: 0.5rem 1rem;
 			flex-direction: column;
-			flex-wrap: wrap;
 			gap: 0.5rem;
 		}
 	}
@@ -91,7 +94,6 @@
 		text-overflow: ellipsis;
 
 		@include media-breakpoint-down(md) {
-			font-size: 1.25rem;
 			white-space: normal;
 		}
 	}
@@ -130,7 +132,6 @@
 		display: flex;
 		flex: 1;
 		overflow: hidden;
-		scroll-behavior: smooth;
 
 		@include media-breakpoint-down(lg) {
 			flex-direction: column;
@@ -485,13 +486,21 @@
 	}
 
 	// ============================================
-	// Tablet / small desktop overrides (md < width < lg)
-	// .esign-main gets column layout at the lg breakpoint but
-	// the base overflow: hidden is still set — allow scrolling.
+	// Tablet & below overrides (width < lg)
+	// At `lg` the layout switches from side-by-side to stacked columns.
+	// .esign-main becomes the scroll container (overflow: auto) and the
+	// sidebar loses its own scroll context so anchor links (#esign-form)
+	// resolve against .esign-main or the viewport instead of the sidebar.
 	// ============================================
 	@include media-breakpoint-down(lg) {
 		.esign-main {
 			overflow: auto;
+			scroll-behavior: smooth; // only matters here where main is scrollable
+		}
+
+		.esign-sidebar {
+			flex: none; // don't stretch; stack naturally
+			overflow-y: unset; // remove scroll context for anchor links
 		}
 	}
 
@@ -506,23 +515,31 @@
 			overflow: visible;
 		}
 
+		// Reset to initial (visible) — not a scroll container, so body handles
+		// anchor-link scrolling. `unset` is semantically clearer than an explicit
+		// `visible` because it signals "no override needed here".
 		.esign-main {
 			flex-direction: column;
-			overflow: visible;
+			overflow: unset;
+			height: auto;
 		}
 
+		// On desktop the pane is a fixed-height scrollable viewport (overflow-y:
+		// auto + flex:1). On mobile we want it to grow to its content height with
+		// no internal scrolling, so reset both overflow and the height constraints.
 		.esign-document-pane {
-			max-height: none;
+			flex: none;
+			height: auto;
 			min-height: auto;
-			flex: none;
+			max-height: none;
+			overflow-y: unset; // remove the auto-scroll; pane expands to content
 		}
 
-		.esign-sidebar {
-			flex: none;
-		}
-
+		// overflow-y: auto in the base rule would create a scroll context inside
+		// the sidebar on mobile; remove it so the page scrolls instead.
 		.esign-form-body {
 			max-height: none;
+			overflow-y: unset;
 		}
 	}
 
