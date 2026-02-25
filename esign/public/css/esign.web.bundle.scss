@@ -530,6 +530,7 @@
 		.esign-document-pane {
 			flex: none;
 			height: auto;
+			padding: 0.5rem;
 			min-height: auto;
 			max-height: none;
 			overflow-y: unset; // remove the auto-scroll; pane expands to content
@@ -540,6 +541,11 @@
 		.esign-form-body {
 			max-height: none;
 			overflow-y: unset;
+		}
+
+		// make the print view more compact on mobile
+		.print-format-gutter {
+			padding: 0.125rem !important;
 		}
 	}
 
