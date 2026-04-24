@@ -505,7 +505,7 @@ def _send_esign_notification(
 		if subject and "{" in subject:
 			subject = frappe.render_template(notification.subject, context)
 
-		message = frappe.render_template(notification.message, context)
+		message = frappe.render_template(notification.message, context) or ""
 
 		# Append audit trail information to the notification email
 		if audit_data:
@@ -1130,7 +1130,8 @@ def _collect_audit_data(doc: Document, wf: "EsignWebForm", print_format: str) ->
 	if not signer_email:
 		email_fieldname = _find_email_fieldname(wf)
 		if email_fieldname:
-			signer_email = doc.get(email_fieldname) or None
+			field_value = doc.get(email_fieldname)
+			signer_email = str(field_value) if field_value else None
 
 	# 3. Fall back to the logged-in user
 	if not signer_email and frappe.session.user and frappe.session.user != "Guest":

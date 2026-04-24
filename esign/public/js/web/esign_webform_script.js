@@ -34,10 +34,13 @@ function scaleToFitDocumentPane() {
 	// Get the natural width of the print format content
 	const contentWidth = printFormat.scrollWidth;
 
-	// Get the available width from the document pane
-	const paneWidth = documentPane.clientWidth;
-	const padding = 32; // Account for padding
-	const availableWidth = paneWidth - padding;
+	// clientWidth = inner width INCLUDING CSS padding.
+	// Subtract the actual horizontal padding so the print format doesn't
+	// overflow into the padded area.
+	const paneStyle = getComputedStyle(documentPane);
+	const horizontalPadding =
+		parseFloat(paneStyle.paddingLeft) + parseFloat(paneStyle.paddingRight);
+	const availableWidth = documentPane.clientWidth - horizontalPadding;
 
 	// Calculate scale factor
 	let scale = 100;
@@ -173,16 +176,6 @@ function initDocumentPreview() {
 	window.addEventListener("resize", () => {
 		clearTimeout(resizeTimeout);
 		resizeTimeout = setTimeout(scaleToFitDocumentPane, 150);
-	});
-
-	// "Sign Now" button - scroll to form on mobile
-	document.querySelectorAll(".esign-scroll-to-form").forEach((btn) => {
-		btn.addEventListener("click", () => {
-			const sidebar = document.querySelector(".esign-sidebar");
-			if (sidebar) {
-				sidebar.scrollIntoView({ behavior: "smooth", block: "start" });
-			}
-		});
 	});
 }
 

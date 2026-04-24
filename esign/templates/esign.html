@@ -45,9 +45,9 @@
 		</div>
 		<div class="esign-header-actions">
 			{% if not is_completed %}
-			<button type="button" class="btn btn-primary btn-md esign-scroll-to-form d-lg-none">
+			<a id="sign-now-button" href="#esign-form" class="btn btn-primary btn-md d-lg-none">
 				{{ _("Sign Now") }}
-			</button>
+			</a>
 			<a href="{{ printview_url }}" target="_blank" class="btn btn-secondary btn-md">
 				{% if frappe_version.startswith('16') %}
 				<svg class="icon icon-sm"><use href="#es-line-download"></use></svg>
@@ -168,7 +168,7 @@
 			{% endif %}
 
 			<!-- Form Card -->
-			<div class="esign-form-card {{ 'd-lg-none' if force_mobile else '' }}">
+			<div id="esign-form" class="esign-form-card {{ 'd-lg-none' if force_mobile else '' }}">
 				<div class="esign-form-header">
 					<h3>{{ _("Fill and Sign") }}</h3>
 				</div>
