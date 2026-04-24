@@ -38,6 +38,20 @@ class ESignDialog {
 			title: __("Send for eSign"),
 			fields: [
 				{
+					label: __("From"),
+					fieldtype: "Link",
+					options: "Email Account",
+					fieldname: "email_account",
+					only_select: 1,
+					get_query: () => {
+						const filters = { enable_outgoing: 1 };
+						if (this.frm.doc.company) {
+							filters.company = this.frm.doc.company;
+						}
+						return { filters };
+					},
+				},
+				{
 					label: __("To"),
 					fieldtype: "MultiSelect",
 					reqd: 1,
@@ -130,19 +144,7 @@ class ESignDialog {
 					fieldtype: "Check",
 					fieldname: "send_me_a_copy",
 				},
-				{
-					label: __("Email Account"),
-					fieldtype: "Link",
-					options: "Email Account",
-					fieldname: "email_account",
-					get_query: () => {
-						const filters = { enable_outgoing: 1 };
-						if (this.frm.doc.company) {
-							filters.company = this.frm.doc.company;
-						}
-						return { filters };
-					},
-				},
+
 				{
 					label: __("Print Format"),
 					fieldtype: "Link",
@@ -202,36 +204,55 @@ class ESignDialog {
 		});
 	}
 
-	prefill_email_account() {
-		const filters = { enable_outgoing: 1 };
-		if (this.frm.doc.company) {
-			filters.company = this.frm.doc.company;
-		}
-		frappe.call({
-			method: "frappe.client.get_list",
-			args: {
-				doctype: "Email Account",
-				filters,
-				fields: ["name", "default_outgoing"],
-				limit_page_length: 0,
-			},
-			callback: (r) => {
-				if (!r.message || r.message.length === 0) return;
-
-				const accounts = r.message;
-				const default_account = accounts.find(
-					(a) => a.default_outgoing,
-				);
-				const selected =
-					default_account ||
-					(accounts.length === 1 ? accounts[0] : null);
-
-				if (selected) {
-					this.dialog.set_value("email_account", selected.name);
+	async prefill_email_account() {
+		// Try custom hook first
+		if (this.frm?.events.get_email_account) {
+			try {
+				const custom_email_account =
+					await this.frm.events.get_email_account(
+						this.frm,
+						"recipients",
+					);
+				if (custom_email_account) {
+					// Ensure proper format for MultiSelect
+					this.dialog.set_value("email_account", custom_email_account);
 				}
-			},
-		});
+			} catch (error) {
+				console.error("Error fetching custom email accounts:", error);
+			}
+		}
+		else {
+			const filters = { enable_outgoing: 1 };
+			if (this.frm.doc.company) {
+				filters.company = this.frm.doc.company;
+			}
+			frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "Email Account",
+					filters,
+					fields: ["name", "default_outgoing"],
+					limit_page_length: 0,
+				},
+				callback: (r) => {
+					if (!r.message || r.message.length === 0) return;
+
+					const accounts = r.message;
+					const default_account = accounts.find(
+						(a) => a.default_outgoing,
+					);
+					const selected =
+						default_account ||
+						(accounts.length === 1 ? accounts[0] : null);
+
+					if (selected) {
+						this.dialog.set_value("email_account", selected.name);
+					}
+				},
+			});
+		}
 	}
+
 
 	on_web_form_change() {
 		const web_form_name = this.dialog.get_value("web_form");
