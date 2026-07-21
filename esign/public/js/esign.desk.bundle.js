@@ -360,7 +360,7 @@ class ESignDialog {
 					if (r.message) {
 						this.dialog.fields_dict.esign_link_preview.$wrapper.html(
 							`<p><strong>eSign Link:</strong></p>
-							<div style="background: #f8f9fa; padding: 10px; border-radius: 4px; word-break: break-all;">
+							<div style="background: var(--control-bg); padding: 10px; border-radius: var(--border-radius); word-break: break-all;">
 								<a href="${r.message}" target="_blank">${r.message}</a>
 							</div>`,
 						);

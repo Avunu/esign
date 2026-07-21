@@ -851,6 +851,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		if (!this.signature_pad) {
 			this.signature_pad = new SignaturePad(this.pad_canvas, {
 				backgroundColor: "transparent",
+				// black ink — baked into the saved signature PNG, which is composited
+				// onto the (white) signed document; must NOT follow the desk theme.
 				penColor: "black",
 			});
 		}
@@ -1042,6 +1044,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		ctx.fillStyle = "transparent";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+		// black ink — baked into the saved signature PNG (see init_signature_pad);
+		// must NOT follow the desk theme or it would be invisible on the document.
 		ctx.fillStyle = "#000000";
 		ctx.textAlign = "center";
 		ctx.textBaseline = "alphabetic";
@@ -1129,10 +1133,41 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 	}
 
 	/**
+	 * Resolves a CSS custom property to a fully-computed color string.
+	 * Canvas 2D can't parse `var(--x)`, so we read the resolved color off a
+	 * hidden probe element — reading `color` guarantees a concrete rgb() value.
+	 */
+	resolve_css_color(var_name, fallback = "#d1d8dd") {
+		const probe = document.createElement("span");
+		probe.style.color = `var(${var_name}, ${fallback})`;
+		probe.style.display = "none";
+		document.body.appendChild(probe);
+		const color = getComputedStyle(probe).color;
+		probe.remove();
+		return color || fallback;
+	}
+
+	/**
+	 * Re-renders the empty-state placeholder when the desk theme changes so its
+	 * border tracks the active theme. Set up once per control instance.
+	 */
+	setup_theme_observer() {
+		if (this._theme_observer) return;
+		this._theme_observer = new MutationObserver(() => {
+			if (!this.get_value()) this.render_display();
+		});
+		this._theme_observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["data-theme"],
+		});
+	}
+
+	/**
 	 * Renders the signature on the display canvas
 	 */
 	render_display() {
 		if (!this.display_canvas) return;
+		this.setup_theme_observer();
 
 		const ctx = this.display_canvas.getContext("2d");
 		ctx.clearRect(
@@ -1175,7 +1210,8 @@ export class ControlSignature extends frappe.ui.form.ControlData {
 		);
 
 		ctx.setLineDash([5, 5]);
-		ctx.strokeStyle = "var(--border-color)";
+		// Canvas can't parse var(); resolve the themed border color from the DOM.
+		ctx.strokeStyle = this.resolve_css_color("--border-color");
 		ctx.lineWidth = 2;
 		ctx.strokeRect(
 			10,

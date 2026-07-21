@@ -27,7 +27,7 @@
 	<div class="content small">
 		<div class="mb-2">
 			<strong>{{ __("Document Integrity") }}</strong>
-			<div class="text-muted" style="font-family: monospace; font-size: 0.75rem; word-break: break-all;">
+			<div class="text-muted" style="font-family: var(--font-family-mono); font-size: var(--text-xs); word-break: break-all;">
 				SHA-256: {{ pdf_hash }}
 			</div>
 		</div>
@@ -58,7 +58,7 @@
 			</div>
 		</div>
 		{% if (user_agent) { %}
-		<div class="text-muted mt-2" style="font-size: 0.7rem; word-break: break-all;">
+		<div class="text-muted mt-2" style="font-size: var(--text-tiny); word-break: break-all;">
 			{{ __("User Agent") }}: {{ user_agent }}
 		</div>
 		{% } %}
