@@ -6,6 +6,9 @@ authors = [
 description = "Collect Electronic Signatures on Frappe Documents via Webforms"
 requires-python = ">=3.10"
 readme = "README.md"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+]
 dynamic = ["version"]
 dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
