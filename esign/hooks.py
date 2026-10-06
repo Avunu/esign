@@ -30,7 +30,7 @@ doctype_js = {
 	"Web Form": "public/js/web_form.js",
 }
 
-if frappe_version == 16:
+if frappe_version >= 16:
 	extend_doctype_class = {
 		"Web Form": "esign.esign.custom.web_form.EsignWebForm",
 		"Email Template": "esign.esign.custom.email_template.EsignEmailTemplate",

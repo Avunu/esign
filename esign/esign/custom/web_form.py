@@ -2,7 +2,7 @@ import hashlib
 import json
 import uuid
 from datetime import datetime
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 import frappe
 from frappe import _
@@ -59,12 +59,31 @@ def validate_esign_key(key: str, doc: Document, require_key: bool = False) -> bo
 	return True
 
 
-# Import PaymentWebForm if available, otherwise create a dummy class
-try:
-	from payments.overrides.payment_webform import PaymentWebForm  # type: ignore
-except ImportError:
-	# Create a dummy class that does nothing if payments isn't installed
-	class PaymentWebForm:
+FRAPPE_MAJOR = int(frappe.__version__.split(".")[0])
+
+# Choose the base class for EsignWebForm.
+#
+# Frappe v16+ registers this class via `extend_doctype_class` (see hooks.py) and composes
+# the final controller as `type(..., (*extensions_in_reverse_install_order, WebForm))`.
+# The payments app registers its PaymentWebForm the same way, so its behaviour is still
+# mixed into the final class. If we also inherited from PaymentWebForm here, installing
+# esign before payments would produce bases (PaymentWebForm, EsignWebForm, WebForm),
+# which has no consistent MRO and breaks loading every Web Form. So on v16+ we only
+# subclass the stock WebForm.
+#
+# Frappe v15 uses `override_doctype_class`, where the last app wins; there we keep
+# inheriting from PaymentWebForm (when installed) so payment behaviour isn't lost.
+if TYPE_CHECKING or FRAPPE_MAJOR >= 16:
+	_EsignWebFormBase = BaseWebForm
+else:
+	try:
+		from payments.overrides.payment_webform import PaymentWebForm  # type: ignore
+	except ImportError:
+		# Dummy mixin when payments isn't installed
+		class PaymentWebForm:
+			pass
+
+	class _EsignWebFormBase(PaymentWebForm, BaseWebForm):
 		pass
 
 
@@ -89,7 +108,7 @@ class AuditData(TypedDict):
 	signed_fields: list[str]
 
 
-class EsignWebForm(PaymentWebForm, BaseWebForm):
+class EsignWebForm(_EsignWebFormBase):
 	"""Custom WebForm override for eSign-specific functionality with custom field types"""
 
 	# Custom fields from ../custom/web_form.json
@@ -293,6 +312,9 @@ class EsignWebForm(PaymentWebForm, BaseWebForm):
 		return super().has_web_form_permission(doctype, name, ptype)
 
 
+_UNSET = object()
+
+
 def attach_print_to_document(
 	doc: Document,
 	print_format: str,
@@ -319,113 +341,42 @@ def attach_print_to_document(
 		}
 	)
 
-	frappe.request = mock_request
+	# Only set the context-local request. Assigning `frappe.request` would replace the
+	# module-level LocalProxy for the rest of this worker process and leak into later jobs.
+	prev_request = getattr(frappe.local, "request", _UNSET)
 	frappe.local.request = mock_request
 
-	# Refetch the document to ensure latest data
-	doc.reload()
+	try:
+		# Refetch the document to ensure latest data
+		doc.reload()
 
-	# Generate the PDF
-	timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-	print_data = attach_print(
-		doctype=doc.doctype,
-		name=doc.name,
-		file_name=f"{doc.name}_signed_{timestamp_str}",
-		print_format=print_format,
-		doc=doc,
-		print_letterhead=False,
-	)
-
-	# Compute SHA-256 hash of the PDF content
-	pdf_content = print_data["fcontent"]
-	pdf_hash = hashlib.sha256(pdf_content).hexdigest()
-	frappe_content_hash = get_content_hash(pdf_content)
-
-	# Attach the signed PDF to the document
-	# Note: content_hash must be set explicitly for cloud_storage deduplication to work,
-	# as cloud_storage's validate() doesn't call the core File validate which generates it
-	file_doc = cast(
-		File,
-		frappe.get_doc(
-			{
-				"doctype": "File",
-				"file_name": print_data["fname"],
-				"attached_to_doctype": doc.doctype,
-				"attached_to_name": doc.name,
-				"folder": "Home/Attachments",
-				"is_private": True,
-				"content": pdf_content,
-				"content_hash": frappe_content_hash,
-			}
-		),
-	)
-	file_doc.insert(ignore_permissions=True)
-
-	# Check if this is a cloud_storage-enhanced File (has s3_key and file_association attributes)
-	is_cloud_storage = hasattr(file_doc, "s3_key") and hasattr(file_doc, "file_association")
-
-	if is_cloud_storage:
-		# Extract s3_key from the file_url and persist it
-		s3_key = str(file_doc.file_url or "").replace("/api/method/retrieve?key=", "")
-		if s3_key:
-			file_doc.db_set("s3_key", s3_key)
-
-	# Commit the file transaction to avoid deadlock with Communication's _comments update.
-	# Cloud storage's associate_files() may have modified the parent document, and the
-	# Communication insert will try to update _comments on the same document.
-	frappe.db.commit()
-
-	# Create Communication record for timeline display with audit data as JSON
-	audit_content = json.dumps(
-		{
-			**audit_data,
-			"pdf_hash": pdf_hash,
-			"file_name": print_data["fname"],
-		}
-	)
-
-	comm = frappe.get_doc(
-		{
-			"doctype": "Communication",
-			"communication_type": "eSign",
-			"subject": f"Document signed: {doc.name}",
-			"content": audit_content,
-			"reference_doctype": doc.doctype,
-			"reference_name": doc.name,
-			"sender": audit_data.get("signer_email"),
-			"sender_full_name": audit_data.get("signer_name"),
-			"communication_date": datetime.now(),
-			"sent_or_received": "Received",
-		}
-	)
-	comm.insert(ignore_permissions=True)
-
-	# Associate the PDF with the Communication
-	if is_cloud_storage:
-		# For cloud_storage, add a file_association instead of duplicating the file
-		from frappe.utils import get_datetime
-
-		file_doc.reload()
-		file_doc.append(
-			"file_association",
-			{
-				"link_doctype": "Communication",
-				"link_name": comm.name,
-				"user": frappe.session.user,
-				"timestamp": get_datetime(),
-			},
+		# Generate the PDF
+		timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+		print_data = attach_print(
+			doctype=doc.doctype,
+			name=doc.name,
+			file_name=f"{doc.name}_signed_{timestamp_str}",
+			print_format=print_format,
+			doc=doc,
+			print_letterhead=False,
 		)
-		file_doc.save(ignore_permissions=True)
-	else:
-		# For standard Frappe, create a separate file attachment
-		comm_file_doc = cast(
+
+		# Compute SHA-256 hash of the PDF content
+		pdf_content = print_data["fcontent"]
+		pdf_hash = hashlib.sha256(pdf_content).hexdigest()
+		frappe_content_hash = get_content_hash(pdf_content)
+
+		# Attach the signed PDF to the document
+		# Note: content_hash must be set explicitly for cloud_storage deduplication to work,
+		# as cloud_storage's validate() doesn't call the core File validate which generates it
+		file_doc = cast(
 			File,
 			frappe.get_doc(
 				{
 					"doctype": "File",
 					"file_name": print_data["fname"],
-					"attached_to_doctype": "Communication",
-					"attached_to_name": comm.name,
+					"attached_to_doctype": doc.doctype,
+					"attached_to_name": doc.name,
 					"folder": "Home/Attachments",
 					"is_private": True,
 					"content": pdf_content,
@@ -433,11 +384,91 @@ def attach_print_to_document(
 				}
 			),
 		)
-		comm_file_doc.save(ignore_permissions=True)
+		file_doc.insert(ignore_permissions=True)
 
-	# Trigger notification with the validated signed PDF attached
-	if notification_name:
-		_send_esign_notification(notification_name, doc, file_doc, audit_data, pdf_hash)
+		# Check if this is a cloud_storage-enhanced File (has s3_key and file_association attributes)
+		is_cloud_storage = hasattr(file_doc, "s3_key") and hasattr(file_doc, "file_association")
+
+		if is_cloud_storage:
+			# Extract s3_key from the file_url and persist it
+			s3_key = str(file_doc.file_url or "").replace("/api/method/retrieve?key=", "")
+			if s3_key:
+				file_doc.db_set("s3_key", s3_key)
+
+		# Commit the file transaction to avoid deadlock with Communication's _comments update.
+		# Cloud storage's associate_files() may have modified the parent document, and the
+		# Communication insert will try to update _comments on the same document.
+		frappe.db.commit()
+
+		# Create Communication record for timeline display with audit data as JSON
+		audit_content = json.dumps(
+			{
+				**audit_data,
+				"pdf_hash": pdf_hash,
+				"file_name": print_data["fname"],
+			}
+		)
+
+		comm = frappe.get_doc(
+			{
+				"doctype": "Communication",
+				"communication_type": "eSign",
+				"subject": f"Document signed: {doc.name}",
+				"content": audit_content,
+				"reference_doctype": doc.doctype,
+				"reference_name": doc.name,
+				"sender": audit_data.get("signer_email"),
+				"sender_full_name": audit_data.get("signer_name"),
+				"communication_date": datetime.now(),
+				"sent_or_received": "Received",
+			}
+		)
+		comm.insert(ignore_permissions=True)
+
+		# Associate the PDF with the Communication
+		if is_cloud_storage:
+			# For cloud_storage, add a file_association instead of duplicating the file
+			from frappe.utils import get_datetime
+
+			file_doc.reload()
+			file_doc.append(
+				"file_association",
+				{
+					"link_doctype": "Communication",
+					"link_name": comm.name,
+					"user": frappe.session.user,
+					"timestamp": get_datetime(),
+				},
+			)
+			file_doc.save(ignore_permissions=True)
+		else:
+			# For standard Frappe, create a separate file attachment
+			comm_file_doc = cast(
+				File,
+				frappe.get_doc(
+					{
+						"doctype": "File",
+						"file_name": print_data["fname"],
+						"attached_to_doctype": "Communication",
+						"attached_to_name": comm.name,
+						"folder": "Home/Attachments",
+						"is_private": True,
+						"content": pdf_content,
+						"content_hash": frappe_content_hash,
+					}
+				),
+			)
+			comm_file_doc.save(ignore_permissions=True)
+
+		# Trigger notification with the validated signed PDF attached
+		if notification_name:
+			_send_esign_notification(notification_name, doc, file_doc, audit_data, pdf_hash)
+	finally:
+		if prev_request is _UNSET:
+			if hasattr(frappe.local, "request"):
+				del frappe.local.request
+		else:
+			frappe.local.request = prev_request
 
 
 def _send_esign_notification(
@@ -929,117 +960,118 @@ def accept(web_form, data):
 	if wf.anonymous and frappe.session.user != "Guest":
 		frappe.session.user = "Guest"
 
-	if data.name and not wf.allow_edit:
-		frappe.throw(_("You are not allowed to update this Web Form Document"))
+	try:
+		if data.name and not wf.allow_edit:
+			frappe.throw(_("You are not allowed to update this Web Form Document"))
 
-	frappe.flags.in_web_form = True
-	meta = frappe.get_meta(doctype)
+		frappe.flags.in_web_form = True
+		meta = frappe.get_meta(doctype)
 
-	is_new = not data.name
-	if data.name:
-		# For eSign forms, always get doc with ignore_permissions since we validated the key
-		doc = frappe.get_doc(doctype, data.name)
-	else:
-		doc = frappe.new_doc(doctype)
+		is_new = not data.name
+		if data.name:
+			# For eSign forms, always get doc with ignore_permissions since we validated the key
+			doc = frappe.get_doc(doctype, data.name)
+		else:
+			doc = frappe.new_doc(doctype)
 
-	# Set ignore_mandatory flag if allow_incomplete is enabled
-	if wf.allow_incomplete:
-		doc.flags.ignore_mandatory = True
+		# Set ignore_mandatory flag if allow_incomplete is enabled
+		if wf.allow_incomplete:
+			doc.flags.ignore_mandatory = True
 
-	# Allow setting set_only_once fields (like signatures) that haven't been set yet.
-	# eSign forms are specifically designed to allow first-time setting of signature
-	# fields on submitted documents via key-based access.
-	doc.flags.ignore_validate_constants = True
+		# Allow setting set_only_once fields (like signatures) that haven't been set yet.
+		# eSign forms are specifically designed to allow first-time setting of signature
+		# fields on submitted documents via key-based access.
+		doc.flags.ignore_validate_constants = True
 
-	# Set web form field values
-	for field in wf.web_form_fields:
-		fieldname = field.fieldname
-		df = meta.get_field(fieldname)
-		value = data.get(fieldname, "")
+		# Set web form field values
+		for field in wf.web_form_fields:
+			fieldname = field.fieldname
+			df = meta.get_field(fieldname)
+			value = data.get(fieldname, "")
 
-		if df and df.fieldtype in ("Attach", "Attach Image"):
-			if value and "data:" and "base64" in value:
-				files.append((fieldname, value))
-				if not doc.name:
-					doc.set(fieldname, "")
-				continue
+			if df and df.fieldtype in ("Attach", "Attach Image"):
+				if value and "data:" and "base64" in value:
+					files.append((fieldname, value))
+					if not doc.name:
+						doc.set(fieldname, "")
+					continue
 
-			elif not value and doc.get(fieldname):
-				files_to_delete.append(doc.get(fieldname))
+				elif not value and doc.get(fieldname):
+					files_to_delete.append(doc.get(fieldname))
 
-		doc.set(fieldname, value)
+			doc.set(fieldname, value)
 
-	# Apply eSign field update if configured
-	if wf.esign_update_field and wf.esign_update_value is not None:
-		try:
-			if meta.has_field(wf.esign_update_field):
-				df = meta.get_field(wf.esign_update_field)
-				if df and df.fieldtype in ("Select", "Link", "Data", "Text"):
-					doc.set(wf.esign_update_field, wf.esign_update_value)
-		except Exception as e:
-			frappe.log_error(
-				title=f"eSign: Failed to set field {wf.esign_update_field} on {doc.doctype}",
-				message=str(e),
-			)
+		# Apply eSign field update if configured
+		if wf.esign_update_field and wf.esign_update_value is not None:
+			try:
+				if meta.has_field(wf.esign_update_field):
+					df = meta.get_field(wf.esign_update_field)
+					if df and df.fieldtype in ("Select", "Link", "Data", "Text"):
+						doc.set(wf.esign_update_field, wf.esign_update_value)
+			except Exception as e:
+				frappe.log_error(
+					title=f"eSign: Failed to set field {wf.esign_update_field} on {doc.doctype}",
+					message=str(e),
+				)
 
-	# Set docstatus for submission if configured (before save)
-	should_submit = (
-		wf.esign_submit_on_response and doc.docstatus == 0 and getattr(doc.meta, "is_submittable", False)
-	)
-	if should_submit:
-		doc.flags.ignore_permissions = True
-		doc.docstatus = DocStatus(1)
+		# Set docstatus for submission if configured (before save)
+		should_submit = (
+			wf.esign_submit_on_response and doc.docstatus == 0 and getattr(doc.meta, "is_submittable", False)
+		)
+		if should_submit:
+			doc.flags.ignore_permissions = True
+			doc.docstatus = DocStatus(1)
 
-	# For new documents, we need to insert first before attaching files
-	if is_new:
-		if wf.login_required and frappe.session.user == "Guest":
-			frappe.throw(_("You must login to submit this form"))
+		# For new documents, we need to insert first before attaching files
+		if is_new:
+			if wf.login_required and frappe.session.user == "Guest":
+				frappe.throw(_("You must login to submit this form"))
 
-		ignore_mandatory = True if (files or wf.allow_incomplete) else False
-		doc.insert(ignore_permissions=True, ignore_mandatory=ignore_mandatory)
+			ignore_mandatory = True if (files or wf.allow_incomplete) else False
+			doc.insert(ignore_permissions=True, ignore_mandatory=ignore_mandatory)
 
-	# Handle file attachments - these require the doc to exist first
-	if files:
-		for f in files:
-			fieldname, filedata = f
+		# Handle file attachments - these require the doc to exist first
+		if files:
+			for f in files:
+				fieldname, filedata = f
 
-			# remove earlier attached file (if exists)
-			if doc.get(fieldname):
-				remove_file_by_url(str(doc.get(fieldname)), doctype=doctype, name=doc.name)
+				# remove earlier attached file (if exists)
+				if doc.get(fieldname):
+					remove_file_by_url(str(doc.get(fieldname)), doctype=doctype, name=doc.name)
 
-			# save new file
-			filename, dataurl = filedata.split(",", 1)
-			_file = cast(
-				File,
-				frappe.get_doc(
-					{
-						"doctype": "File",
-						"file_name": filename,
-						"attached_to_doctype": doctype,
-						"attached_to_name": doc.name,
-						"content": dataurl,
-						"decode": True,
-					}
-				),
-			)
-			_file.save(ignore_permissions=True)
+				# save new file
+				filename, dataurl = filedata.split(",", 1)
+				_file = cast(
+					File,
+					frappe.get_doc(
+						{
+							"doctype": "File",
+							"file_name": filename,
+							"attached_to_doctype": doctype,
+							"attached_to_name": doc.name,
+							"content": dataurl,
+							"decode": True,
+						}
+					),
+				)
+				_file.save(ignore_permissions=True)
 
-			# update the doc with file URL
-			doc.set(fieldname, _file.file_url)
+				# update the doc with file URL
+				doc.set(fieldname, _file.file_url)
 
-	# Single save for all changes (existing docs or new docs with files)
-	if not is_new or files:
-		doc.save(ignore_permissions=True)
+		# Single save for all changes (existing docs or new docs with files)
+		if not is_new or files:
+			doc.save(ignore_permissions=True)
 
-	# Clean up deleted files
-	if files_to_delete:
-		for f in files_to_delete:
-			if f:
-				remove_file_by_url(f, doctype=doctype, name=doc.name)
-
-	# Restore user session if needed
-	if wf.anonymous and frappe.session.user == "Guest" and user:
-		frappe.session.user = user
+		# Clean up deleted files
+		if files_to_delete:
+			for f in files_to_delete:
+				if f:
+					remove_file_by_url(f, doctype=doctype, name=doc.name)
+	finally:
+		# Restore user session if needed (also on error, so the request isn't left as Guest)
+		if wf.anonymous and frappe.session.user == "Guest" and user:
+			frappe.session.user = user
 
 	frappe.flags.web_form_doc = doc
 
