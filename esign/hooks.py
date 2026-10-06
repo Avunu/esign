@@ -7,7 +7,7 @@ app_title = "eSign"
 app_publisher = "Avunu LLC"
 app_description = "Collect Electronic Signatures on Frappe Documents via Webforms"
 app_email = "mail@avu.nu"
-app_license = "mit"
+app_license = "MIT"
 
 app_include_js = ["esign.desk.bundle.js", "esign.control.bundle.js"]
 app_include_css = [
